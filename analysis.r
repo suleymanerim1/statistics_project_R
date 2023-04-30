@@ -56,3 +56,5 @@ data <- data %>% mutate(Gender = ifelse(Gender == "Male", 1, 0)) %>% as.factor()
 summary(data$Gender)
 
 data$Customer_Type = as.factor(data$Customer_Type)
+
+# comment 
