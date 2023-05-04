@@ -1,5 +1,6 @@
 # import libraries
 library(tidyverse)
+library(corrplot)
 
 data_train = read.csv("train.csv")
 data_test = read.csv("test.csv")
@@ -98,4 +99,36 @@ correlation_matrix = cor(train[, sapply(train, is.numeric)])
 # plot correlation matrix
 corrplot(correlation_matrix, method = "circle")
 
+#export the dataset in a csv file
+write.csv(data, file = "data.csv")
 
+
+
+library(ggplot2)
+
+# Compute the correlation matrix
+corr <- cor(data)
+
+# Plot a heatmap of the correlation matrix
+ggplot(data = reshape2::melt(corr)) +
+  geom_tile(aes(x = Var1, y = Var2, fill = value)) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab",
+                       name="Correlation") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 1, 
+                                    size = 10, hjust = 1)) +
+  coord_fixed()
+
+# Find the high correlation features
+satisfaction_corr <- corr['satisfaction',]
+high_corr_features <- names(satisfaction_corr[abs(satisfaction_corr) > 0.3])
+
+# Compute the correlations between the high correlation features and satisfaction
+correlations <- data.frame(
+  feature = high_corr_features,
+  correlation = sapply(high_corr_features, function(x) cor(data[,x], data$satisfaction))
+)
+
+#drop last row of correlations
+correlations = correlations[-length(correlations$feature),]
+correlations
