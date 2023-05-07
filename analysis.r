@@ -219,7 +219,7 @@ partial_corr <- correlation(train, partial=TRUE, method='pearson')
 write.csv(partial_corr, file = "partial_corr.csv")
 
 partial_correlations = read.csv("partial_corr.csv", header = TRUE, sep = ",")
-partial_correlations = as.matrix(partial_correlations)
+
 
 
 #make the first column the row names
@@ -228,7 +228,16 @@ rownames(partial_correlations) = partial_correlations[,1]
 partial_correlations = partial_correlations[,-1]
 
 
+partial_correlations
 
+
+rownames(partial_correlations)
+colnames(partial_correlations)
+
+# Create a new matrix with rounded partial correlations
+partial_correlations_rounded <- round(partial_correlations, digits = 3)
+
+partial_correlations_rounded
 
 
 # Initialize empty data frame with 0 rows
@@ -238,32 +247,33 @@ df <- data.frame(variable1 = character(),
                  stringsAsFactors = FALSE)
 
 # Loop over rows and columns of matrix
-for (i in 1:nrow(partial_correlations)) {
-  for (j in 1:ncol(partial_correlations)) {
-    
+for (i in 1:nrow(partial_correlations_rounded)) {
+  for (j in 1:ncol(partial_correlations_rounded)) {
+    print(partial_correlations_rounded[i,j])
     # Check if value meets criterion
-    if (partial_correlations[i,j] > 0.3 | partial_correlations[i,j] < -0.3) {
-      
+    if ((partial_correlations_rounded[i,j] > 0.300 | partial_correlations_rounded[i,j] < -0.300)& i != j) {
+      print('it is true')
       # Add row to data frame
-      df <- rbind(df, data.frame(variable1 = rownames(partial_correlations)[i],
-                                 variable2 = colnames(partial_correlations)[j],
-                                 value = partial_correlations[i,j],
+      df <- rbind(df, data.frame(variable1 = rownames(partial_correlations_rounded)[i],
+                                 variable2 = colnames(partial_correlations_rounded)[j],
+                                 value = partial_correlations_rounded[i,j],
                                  stringsAsFactors = FALSE))
     }
   }
 }
 
-partial_correlations
-# Show resulting data frame
-df
-
 
 # Group the data frame by variable1 and extract top 3 values for each group
 df_top3 <- df %>% group_by(variable1) %>% top_n(3, value) %>% ungroup()
 
-# View resulting data frame with top 3 values for each variable1
-df_top3
+#order by variable1
+df_top3 <- df_top3[order(df_top3$variable1),]
+print(df_top3, n = nrow(df_top3))
 
+#delete duplicates in the dataframe if variable1 is equal to variable2
+df_top3 <- df_top3[!(df_top3$variable1 == df_top3$variable2),]
+
+print(df_top3, n = nrow(df_top3))
 #save on cvs
 write.csv(df_top3, file = "df_top3.csv")
 
