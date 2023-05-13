@@ -168,3 +168,182 @@ library(corrplot)
 corrplot(correlation_matrix, method = "circle")
 ```
 
+train
+
+## LOGISTIC REGRESSION
+
+```{r}
+# Model definition:
+glm_compl<- glm(data = train,
+                satisfaction ~ .,
+                family = "binomial")
+# We compute the reference level R-Squared
+s<- summary(glm_compl)
+r2<- 1 - (s$deviance/s$null.deviance)
+1/(1-r2)
+```
+```{r}
+# VIF Iteration 1 
+# Using the VIF function and comparing the obtained values with the
+# computed quantity:
+# (The process is done iteratively where we delete one variable at time)
+library(regclass)
+vif_values <- VIF(glm_compl)
+
+
+
+# Create a data frame with variable names and their corresponding VIF values
+vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
+
+# Sort the data frame in decreasing order of VIF values
+sorted_df <- vif_df[order(-vif_df$VIF), ]
+
+# Print the sorted data frame
+print(sorted_df)
+```
+```{r}
+# VIF Iteration 2
+# Using the VIF function and comparing the obtained values with the
+# computed quantity:
+# (The process is done iteratively where we delete one variable at time)
+# Model definition:
+glm_compl<- glm(data = train,
+                satisfaction ~ .-Arrival_Delay_in_Minutes,
+                family = "binomial")
+vif_values <- VIF(glm_compl)
+
+# Create a data frame with variable names and their corresponding VIF values
+vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
+
+# Sort the data frame in decreasing order of VIF values
+sorted_df <- vif_df[order(-vif_df$VIF), ]
+
+# Print the sorted data frame
+print(sorted_df)
+```
+
+
+
+```{r}
+# VIF Iteration 3
+# Using the VIF function and comparing the obtained values with the
+# computed quantity:
+# (The process is done iteratively where we delete one variable at time)
+# Model definition:
+glm_compl<- glm(data = train,
+                satisfaction ~ .-Arrival_Delay_in_Minutes-Inflight_entertainment,
+                family = "binomial")
+vif_values <- VIF(glm_compl)
+
+# Create a data frame with variable names and their corresponding VIF values
+vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
+
+# Sort the data frame in decreasing order of VIF values
+sorted_df <- vif_df[order(-vif_df$VIF), ]
+
+# Print the sorted data frame
+print(sorted_df)
+```
+
+
+```{r}
+# VIF Iteration 4
+# Using the VIF function and comparing the obtained values with the
+# computed quantity:
+# (The process is done iteratively where we delete one variable at time)
+# Model definition:
+glm_compl<- glm(data = train,
+                satisfaction ~ .-Arrival_Delay_in_Minutes-Inflight_entertainment
+                -Ease_of_Online_booking	,
+                family = "binomial")
+vif_values <- VIF(glm_compl)
+
+# Create a data frame with variable names and their corresponding VIF values
+vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
+
+# Sort the data frame in decreasing order of VIF values
+sorted_df <- vif_df[order(-vif_df$VIF), ]
+
+# Print the sorted data frame
+print(sorted_df)
+```
+
+
+```{r}
+# VIF Iteration 5
+# Using the VIF function and comparing the obtained values with the
+# computed quantity:
+# (The process is done iteratively where we delete one variable at time)
+# Model definition:
+glm_compl<- glm(data = train,
+                satisfaction ~ .-Arrival_Delay_in_Minutes-Inflight_entertainment
+                -Ease_of_Online_booking - Cleanliness	,
+                family = "binomial")
+vif_values <- VIF(glm_compl)
+
+# Create a data frame with variable names and their corresponding VIF values
+vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
+
+# Sort the data frame in decreasing order of VIF values
+sorted_df <- vif_df[order(-vif_df$VIF), ]
+
+# Print the sorted data frame
+print(sorted_df)
+```
+
+```{r}
+glm_compl<- glm(data = train,
+                satisfaction ~ .-Arrival_Delay_in_Minutes-Inflight_entertainment
+                -Ease_of_Online_booking - Cleanliness	,
+                family = "binomial")
+# Observation of the model summary:
+summary(glm_compl)
+```
+```{r}
+glm_compl<- glm(data = train,
+                satisfaction ~ .-Arrival_Delay_in_Minutes-Inflight_entertainment
+                -Ease_of_Online_booking - Cleanliness
+                -Flight_Distance -Gate_location,
+                family = "binomial")
+# Observation of the model summary:
+summary(glm_compl)
+```
+```{r}
+glm_compl<- glm(data = train,
+                satisfaction ~ .-Arrival_Delay_in_Minutes-Inflight_entertainment
+                -Ease_of_Online_booking - Cleanliness
+                -Flight_Distance -Gate_location,
+                family = "binomial")
+
+
+# Computing the predictions with the model on the test set:
+pred_glm_compl<- predict(glm_compl, test, type = "response")
+
+# Converting the prediction in {0,1} according to the chosen threshold:
+
+threshold4<- 0.4
+threshold5<- 0.5
+threshold6<- 0.6
+
+pred_glm_compl_04<- ifelse(pred_glm_compl > threshold4, 1, 0)
+pred_glm_compl_05<- ifelse(pred_glm_compl > threshold5, 1, 0)
+pred_glm_compl_06<- ifelse(pred_glm_compl > threshold6, 1, 0)
+```
+
+
+
+
+```{r}
+# Confusion matrix with threshold = 0.4
+table(test_true, pred_glm_compl_04)
+mean(pred_glm_compl_04==test_true)
+
+# Confusion matrix with threshold = 0.5
+table(test_true, pred_glm_compl_05)
+mean(pred_glm_compl_05==test_true)
+
+# Confusion matrix with threshold = 0.6
+table(test_true, pred_glm_compl_06)
+mean(pred_glm_compl_06==test_true)
+```
+
