@@ -135,7 +135,10 @@ dim(test)
 ```{r}
 # save true values of test satisfaction column
 test_true = test$satisfaction
+test_true <- as.integer(test_true)
+typeof(test_true)
 ```
+
 
 ```{r}
 # drop satisfaction column from test data
@@ -324,10 +327,14 @@ pred_glm_compl<- predict(glm_compl, test, type = "response")
 threshold4<- 0.4
 threshold5<- 0.5
 threshold6<- 0.6
+threshold7<- 0.7
+
 
 pred_glm_compl_04<- ifelse(pred_glm_compl > threshold4, 1, 0)
 pred_glm_compl_05<- ifelse(pred_glm_compl > threshold5, 1, 0)
 pred_glm_compl_06<- ifelse(pred_glm_compl > threshold6, 1, 0)
+pred_glm_compl_07<- ifelse(pred_glm_compl > threshold7, 1, 0)
+
 ```
 
 
@@ -345,6 +352,10 @@ mean(pred_glm_compl_05==test_true)
 # Confusion matrix with threshold = 0.6
 table(test_true, pred_glm_compl_06)
 mean(pred_glm_compl_06==test_true)
+
+# Confusion matrix with threshold = 0.7
+table(test_true, pred_glm_compl_07)
+mean(pred_glm_compl_07==test_true)
 ```
 
 ```{r}
@@ -368,22 +379,118 @@ summary(glm_compl_step)
 ```
 ```{r}
 # Computing the predictions with the model on the test set:
-pred_glm_compl<- predict(glm_compl, test, type = "response")
+pred_glm_comp_step<- predict(glm_compl_step, test, type = "response")
 # Converting the prediction in {0,1} according to the chosen threshold:
-pred_glm_compl_04<- ifelse(pred_glm_compl > threshold4, 1, 0)
-pred_glm_compl_05<- ifelse(pred_glm_compl > threshold5, 1, 0)
-pred_glm_compl_06<- ifelse(pred_glm_compl > threshold6, 1, 0)
+pred_glm_compl_step_04<- ifelse(pred_glm_comp_step > threshold4, 1, 0)
+pred_glm_compl_step_05<- ifelse(pred_glm_comp_step > threshold5, 1, 0)
+pred_glm_compl_step_06<- ifelse(pred_glm_comp_step > threshold6, 1, 0)
+pred_glm_compl_step_07<- ifelse(pred_glm_comp_step > threshold7, 1, 0)
+
 
 # Confusion matrix with threshold = 0.4
-table(test_true, pred_glm_compl_04)
-mean(pred_glm_compl_04==test_true)
+table(test_true, pred_glm_compl_step_04)
+mean(pred_glm_compl_step_04==test_true)
 # Confusion matrix with threshold = 0.5
-table(test_true, pred_glm_compl_05)
-mean(pred_glm_compl_05==test_true)
+table(test_true, pred_glm_compl_step_05)
+mean(pred_glm_compl_step_05==test_true)
 # Confusion matrix with threshold = 0.6
-table(test_true, pred_glm_compl_06)
-mean(pred_glm_compl_06==test_true)
+table(test_true, pred_glm_compl_step_06)
+mean(pred_glm_compl_step_06==test_true)
 
-
+# Confusion matrix with threshold = 0.7
+table(test_true, pred_glm_compl_step_07)
+mean(pred_glm_compl_step_07==test_true)
 ```
 
+```{r}
+library(tidyverse)
+# First we present the original classification :
+ggplot(test, aes(x =Flight_Distance ,
+y = Departure_Delay_in_Minutes ,
+color = factor(test_true))) +
+  geom_point(size = 2)+  
+  labs(x = "Flight Distance",y = "Departure Delay (minutes)",
+       color ="Satisfaction")+
+  scale_color_manual(values = c("0" = "red", "1" = "darkgreen"))
+  theme(legend.position = c(0.8, 0.8))
+```
+
+
+```{r}
+# The we try to reproduce the same plot as above, considering the
+# classifications obtained with the models
+library(gridExtra)
+a <- ggplot(test,
+            aes(
+              x = Flight_Distance ,
+              y = Departure_Delay_in_Minutes ,
+              color = factor(pred_glm_compl_06)
+            )) +
+  geom_point(size = 2) +
+  labs(
+    x = "Flight Distance",
+    y = "Departure Delay (minutes)",
+    color = "Satisfaction",
+    title = "Simple GLM : 0.6"
+  ) +
+  scale_color_manual(values = c("0" = "red", "1" = "darkgreen")) +
+  theme(legend.position = c(0.8, 0.8))
+
+b <- ggplot(test,
+            aes(
+              x = Flight_Distance ,
+              y = Departure_Delay_in_Minutes ,
+              color = factor(pred_glm_compl_step_06)
+            )) +
+  geom_point(size = 2) +
+  labs(
+    x = "Flight Distance",
+    y = "Departure Delay (minutes)",
+    color = "Satisfaction",
+    title = "Simple GLM stepwize : 0.6"
+  ) +
+  scale_color_manual(values = c("0" = "red", "1" = "darkgreen")) +
+theme(legend.position = c(0.8, 0.8))
+
+grid.arrange(a, b,ncol = 2)
+```
+
+```{r}
+# We compare the results obtained with the two different models, plotting
+# now an estimation of the logistic curve using the predictions given by
+# the models:
+predicted_data <-
+  data.frame(prob.of.Satisfaction = pred_glm_compl, Satisfaction = test_true)
+predicted_data <-
+  predicted_data[order(predicted_data$prob.of.Satisfaction, decreasing = FALSE), ]
+predicted_data$rank <- 1:nrow(predicted_data)
+a <- ggplot(data = predicted_data, aes(x = rank, y = prob.of.Satisfaction)) +
+  geom_point(
+    aes(color = as.factor(Satisfaction)),
+    alpha = 1,
+    shape = 1,
+    stroke = 1
+  ) +
+  xlab("Index") +
+  ylab("Predicted probability") +
+  ggtitle("Estimated Logistic Curve - Simple GLM")
+
+
+predicted_data <-
+  data.frame(prob.of.Satisfaction = pred_glm_comp_step, Satisfaction = test_true)
+predicted_data <-
+  predicted_data[order(predicted_data$prob.of.Satisfaction, decreasing = FALSE), ]
+predicted_data$rank <- 1:nrow(predicted_data)
+b <- ggplot(data = predicted_data, aes(x = rank, y = prob.of.Satisfaction)) +
+  geom_point(
+    aes(color = as.factor(Satisfaction)),
+    alpha = 1,
+    shape = 1,
+    stroke = 1
+  ) +
+  xlab("Index") +
+  ylab("Predicted probability") +
+  ggtitle("Estimated Logistic Curve - GLM with Stepwise")
+
+grid.arrange(a, b, nrow = 2)
+```
