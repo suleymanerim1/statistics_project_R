@@ -347,3 +347,43 @@ table(test_true, pred_glm_compl_06)
 mean(pred_glm_compl_06==test_true)
 ```
 
+```{r}
+library(MASS)
+
+#Model definition:
+# Here we don't re-apply the VIF method because we start from the
+# previous result.
+glm_compl<- glm(data = train,
+                satisfaction ~ .-Arrival_Delay_in_Minutes-Inflight_entertainment
+                -Ease_of_Online_booking - Cleanliness	,
+                family = "binomial")
+
+# Application of the Stepwise method, specifying that we consider
+# both the forward and the backward directions. We consider as
+# reference metric the Akaike Information Criterion:
+glm_compl_step <- stepAIC(glm_compl, direction = "both",
+trace = FALSE)
+# Observation of the model summary:
+summary(glm_compl_step)
+```
+```{r}
+# Computing the predictions with the model on the test set:
+pred_glm_compl<- predict(glm_compl, test, type = "response")
+# Converting the prediction in {0,1} according to the chosen threshold:
+pred_glm_compl_04<- ifelse(pred_glm_compl > threshold4, 1, 0)
+pred_glm_compl_05<- ifelse(pred_glm_compl > threshold5, 1, 0)
+pred_glm_compl_06<- ifelse(pred_glm_compl > threshold6, 1, 0)
+
+# Confusion matrix with threshold = 0.4
+table(test_true, pred_glm_compl_04)
+mean(pred_glm_compl_04==test_true)
+# Confusion matrix with threshold = 0.5
+table(test_true, pred_glm_compl_05)
+mean(pred_glm_compl_05==test_true)
+# Confusion matrix with threshold = 0.6
+table(test_true, pred_glm_compl_06)
+mean(pred_glm_compl_06==test_true)
+
+
+```
+
