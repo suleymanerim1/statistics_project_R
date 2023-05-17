@@ -53,6 +53,10 @@ train = data[train_index,]
 # 20% of data is used for testing
 test = data[-train_index,]
 
+# save train and test data
+write.csv(train, file = "train_clean.csv")
+write.csv(test, file = "test_clean.csv")
+
 # print dimension of train and test data
 dim(train)
 dim(test)
@@ -73,7 +77,7 @@ prop.table(table(test_true))
 train_satisfaction = train$satisfaction
 
 # correlation matrix only for numeric variables
-correlation_matrix = cor(train[, sapply(train, is.numeric)])
+correlation_matrix = cor(data[, sapply(data, is.numeric)])
 
 # plot correlation matrix
 corrplot(correlation_matrix, method = "circle")
@@ -84,9 +88,6 @@ write.csv(data, file = "data.csv")
 summary(data)
 
 library(ggplot2)
-
-# Compute the correlation matrix
-corr <- cor(data)
 
 # Plot a heatmap of the correlation matrix
 ggplot(data = reshape2::melt(corr)) +
@@ -105,8 +106,6 @@ high_corr_features <- names(satisfaction_corr[abs(satisfaction_corr) > 0.3 | abs
 
 
 
-
-
 # Compute the correlations between the high correlation features and satisfaction
 correlations <- data.frame(
   feature = high_corr_features,
@@ -116,6 +115,9 @@ correlations <- data.frame(
 
 #drop last row of correlations
 correlations = correlations[-length(correlations$feature),]
+
+#save on cvs
+write.csv(correlations, file = "correlations.csv")
 correlations
 
 #satisfaction
@@ -124,7 +126,7 @@ sat = train$satisfaction
 
 #plot the density of columns of data which names are in correlations. use barplots.
 
-
+#TODO: make them visually right.
 
 a = ggplot(train, aes(x = Type_of_Travel, fill = satisfaction)) +
   geom_bar(fill = 'Blue', alpha = 0.4) +
@@ -179,44 +181,18 @@ grid.arrange(a, b, c, d, e, f, g, h, ncol = )
 #So we look for all the correlations between variables
 #We pick the highest, setting a treshold of our choice
 
-library(ppcor)
-#we need to use correlation
-# Compute partial correlations
-correlated <- pcor(train, method = "pearson")
-
-# Extract lower triangle of correlation matrix and convert to data frame
-correlated_df <- as.data.frame(correlated$estimate)
-
-#print row names
-colnames(correlated_df)
-rownames(correlated_df)
-correlated_df
-
-#plot the correlation matrix
-corrplot(correlated$estimate, method = "circle")
-
-# find values of correlations higher than 0.3 or lower than -0.3 and save them in a dataframe with row names and column names
-correlated_df <- subset(correlated_df, abs(correlated_df) > 0.3)
-correlated_df <- as.data.frame(as.table(correlated_df))
-
-
-correlated_df
-
-saveRDS(correlated, "correlated.rds")
-
-
-
-
 #build a dataframe where for each variable we look the partial correlation with all the others
 #we pick the highest and we save it in a dataframe
 #we set a treshold of 0
 
 
 library(correlation)
-correlation(train, partial=TRUE, method='pearson')
+#correlation(train, partial=TRUE, method='pearson')
 #save the partial correlation matrix result in a dataframe and output a file for further analysis
-partial_corr <- correlation(train, partial=TRUE, method='pearson')
-write.csv(partial_corr, file = "partial_corr.csv")
+
+
+#partial_corr <- correlation(train, partial=TRUE, method='pearson')
+#write.csv(partial_corr, file = "partial_corr.csv")
 
 partial_correlations = read.csv("partial_corr.csv", header = TRUE, sep = ",")
 
@@ -264,7 +240,7 @@ for (i in 1:nrow(partial_correlations_rounded)) {
 
 
 # Group the data frame by variable1 and extract top 3 values for each group
-df_top3 <- df %>% group_by(variable1) %>% top_n(3, value) %>% ungroup()
+df_top3 <- df %>% group_by(variable1) %>% top_n(4, value) %>% ungroup()
 
 #order by variable1
 df_top3 <- df_top3[order(df_top3$variable1),]
@@ -278,3 +254,18 @@ print(df_top3, n = nrow(df_top3))
 write.csv(df_top3, file = "df_top3.csv")
 
 
+
+#TODO:EXPLAIN THE CORRELATIONS AND PLOTTING THE RESULTS 
+
+#Relations Map for Features
+
+
+
+#LOGISTIC REGRESSION MODELS
+# Fit the logistic regression model
+features = colnames(partial_correlations)
+model <- glm(formula = formula("satisfaction ~  -Gender -Customer_type -Age -Type_of_Travel"), data = train, family = binomial)
+
+
+# View the model summary
+summary(model)
