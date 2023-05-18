@@ -12,6 +12,10 @@ library(ROSE) # for oversampling (just in case)
 library(leaps) # for stepwise selection
 
 #read data
+#CHOOSE BETWEEN:
+#data.csv = original dataset
+#data_without_null_and_all_numeric.csv = dataset without null values and all numeric
+
 data = read.csv("data.csv")
 #drop X column
 data = data %>% select(-X)
@@ -180,4 +184,19 @@ table(y_test, logistic_pred_stepwise)
 
 #show accuracy
 mean(logistic_pred_stepwise == y_test)
+
+install.packages('e1071')
+library(e1071)
+
+#Build a simple svm model
+svm_model = svm(satisfaction ~ ., data = train)
+summary(svm_model)
+
+#predict on test data
+svm_pred = predict(svm_model, newdata = test)
+svm_pred = ifelse(svm_pred > 0.5, 1, 0)
+
+#show confusion matrix
+confusionMatrix(as.factor(svm_pred), as.factor(y_test))
+table(y_test, svm_pred)
 
