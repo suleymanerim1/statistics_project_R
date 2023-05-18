@@ -47,7 +47,7 @@ plot(leverage, pch = 19, col = "blue", main = "Leverage Statistic", xlab = "Obse
 
 #compute the VIF
 
-glm_compl = glm(satisfaction ~ ., data = train, family = "binomial")
+glm_compl = glm(satisfaction ~ ., data = data, family = "binomial")
 
 #We compute the reference level R-squared
 
@@ -58,7 +58,7 @@ r2 = 1 - (s$deviance/s$null.deviance)
 
 
 vif = vif(glm_compl)
-
+vif
 #Depending on what value of VIF you deem to be too high to include in the model, 
 #you may choose to remove certain predictor variables and see if the corresponding 
 #R-squared value or standard error of the model is affected.
