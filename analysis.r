@@ -2,6 +2,8 @@
 library(tidyverse)
 library(corrplot)
 library(ggplot2)
+library(gridExtra)
+library(correlation)
 
 data_train = read.csv("train.csv")
 data_test = read.csv("test.csv")
@@ -10,15 +12,12 @@ data_test = read.csv("test.csv")
 data = rbind(data_train, data_test)
 attach(data)
 
-# print dimension of data
-print(dim(data))
-summary(data)
 
+
+
+# DATA PREPROCESSING
 # replace dots with underscores in column names
 names(data) = gsub("\\.", "_", names(data))
-
-# print column names
-print(names(data))
 
 # drop X and id column
 #TODO: explain why
@@ -26,24 +25,31 @@ data = data %>% select(-X, -id)
 
 # convert gender to numeric and then to factor
 data$Gender = as.numeric(as.factor(data$Gender)) -1
-
-
 # change type of customer to 0 and disloyal customer to 1
 data$Customer_Type = as.numeric(factor(data$Customer_Type, levels = c("Loyal Customer", "disloyal Customer"))) - 1
 # change type of tr avel to 0 and personal travel to 1
 data$Type_of_Travel = as.numeric(factor(data$Type_of_Travel, levels = c("Personal Travel", "Business travel"))) - 1
-
 # change class Business is 2, Eco Plus is 1 and Eco is 0
 data$Class = as.numeric(factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))) - 1
-
 data$satisfaction = as.numeric(factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))) - 1
 
 # drop na values in Arrival Delay in Minutes
 # TODO: explain why (now it's dropped to simplify the analysis)
 data = data %>% drop_na(Arrival_Delay_in_Minutes)
 
+
+
+
+
+
 # DATA BALANCE: quite balanced
 prop.table(table(data$satisfaction))
+
+
+
+
+
+
 
 # Train-test split
 set.seed(123)
@@ -53,13 +59,10 @@ train = data[train_index,]
 # 20% of data is used for testing
 test = data[-train_index,]
 
-# save train and test data
-write.csv(train, file = "train_clean.csv")
-write.csv(test, file = "test_clean.csv")
-
-# print dimension of train and test data
-dim(train)
-dim(test)
+# merge train and test data
+data = rbind(train, test)
+#save on cvs
+write.csv(data, file = "data.csv")
 
 # save true values of test satisfaction column
 test_true = test$satisfaction
@@ -71,6 +74,16 @@ test = test %>% select(-satisfaction)
 prop.table(table(train$satisfaction))
 prop.table(table(test_true))
 
+
+
+
+
+
+
+
+
+
+
 # DATA ANALYSIS
 
 # save satisfaction column of train data
@@ -81,13 +94,6 @@ correlation_matrix = cor(data[, sapply(data, is.numeric)])
 
 # plot correlation matrix
 corrplot(correlation_matrix, method = "circle")
-
-#export the dataset in a csv file
-write.csv(data, file = "data.csv")
-
-summary(data)
-
-library(ggplot2)
 
 # Plot a heatmap of the correlation matrix
 ggplot(data = reshape2::melt(corr)) +
@@ -112,13 +118,18 @@ correlations <- data.frame(
   correlation = sapply(high_corr_features, function(x) cor(data[,x], data$satisfaction))
 )
 
+correlations
+#plot the correlations
+ggplot(correlations, aes(x = reorder(feature, correlation), y = correlation)) +
+  geom_bar(stat = "identity", fill = "blue", alpha = 0.4) +
+  ggtitle("Correlation between features and satisfaction") +
+  xlab('Features') +
+  ylab('Correlation')
 
-#drop last row of correlations
-correlations = correlations[-length(correlations$feature),]
+
 
 #save on cvs
 write.csv(correlations, file = "correlations.csv")
-correlations
 
 #satisfaction
 sat = train$satisfaction
@@ -171,7 +182,7 @@ h = ggplot(train, aes(x = Cleanliness, fill = satisfaction)) +
   xlab('Cleanliness')
 
 
-library(gridExtra)
+
 
 grid.arrange(a, b, c, d, e, f, g, h, ncol = )
 
@@ -186,7 +197,6 @@ grid.arrange(a, b, c, d, e, f, g, h, ncol = )
 #we set a treshold of 0
 
 
-library(correlation)
 #correlation(train, partial=TRUE, method='pearson')
 #save the partial correlation matrix result in a dataframe and output a file for further analysis
 
@@ -196,27 +206,20 @@ library(correlation)
 
 partial_correlations = read.csv("partial_corr.csv", header = TRUE, sep = ",")
 
-
-
 #make the first column the row names
 rownames(partial_correlations) = partial_correlations[,1]
-#drop the first column
-partial_correlations = partial_correlations[,-1]
 
-
-partial_correlations
-
-
-rownames(partial_correlations)
 colnames(partial_correlations)
+#drop the first  (X) column
+partial_correlations = partial_correlations[,-1]
 
 # Create a new matrix with rounded partial correlations
 partial_correlations_rounded <- round(partial_correlations, digits = 3)
 
-partial_correlations_rounded
-
 
 # Initialize empty data frame with 0 rows
+# We need it to create a data frame with the results and
+# so to show better the correlations.
 df <- data.frame(variable1 = character(),
                  variable2 = character(),
                  value = numeric(),
@@ -244,7 +247,7 @@ df_top3 <- df %>% group_by(variable1) %>% top_n(4, value) %>% ungroup()
 
 #order by variable1
 df_top3 <- df_top3[order(df_top3$variable1),]
-print(df_top3, n = nrow(df_top3))
+
 
 #delete duplicates in the dataframe if variable1 is equal to variable2
 df_top3 <- df_top3[!(df_top3$variable1 == df_top3$variable2),]

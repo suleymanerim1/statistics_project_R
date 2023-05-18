@@ -47,7 +47,7 @@ plot(leverage, pch = 19, col = "blue", main = "Leverage Statistic", xlab = "Obse
 
 #compute the VIF
 
-glm_compl = glm(satisfaction ~ ., data = train, family = "binomial")
+glm_compl = glm(satisfaction ~ ., data = data, family = "binomial")
 
 #We compute the reference level R-squared
 
