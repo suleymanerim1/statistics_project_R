@@ -4,6 +4,8 @@ library(corrplot)
 library(ggplot2)
 library(gridExtra)
 library(correlation)
+library(reshape)
+library(reshape2)
 
 data_train = read.csv("train.csv")
 data_test = read.csv("test.csv")
@@ -12,7 +14,7 @@ data_test = read.csv("test.csv")
 data = rbind(data_train, data_test)
 attach(data)
 
-
+par(mfrow = c(1, 1))
 
 
 # DATA PREPROCESSING
@@ -20,7 +22,7 @@ attach(data)
 names(data) = gsub("\\.", "_", names(data))
 
 # drop X and id column
-# TODO: explain why we remove ID (now it's removed to simplify the analysis)
+#TODO: explain why
 data = data %>% select(-X, -id)
 
 # convert gender to numeric and then to factor
@@ -33,33 +35,44 @@ data$Type_of_Travel = as.numeric(factor(data$Type_of_Travel, levels = c("Persona
 data$Class = as.numeric(factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))) - 1
 data$satisfaction = as.numeric(factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))) - 1
 
-# print proportion of na values in each column
-prop.table(colSums(is.na(data)))
-
-# print proportion of na values in Arrival Delay in Minutes
-prop.table(table(is.na(data$Arrival_Delay_in_Minutes)))
 
 # drop na values in Arrival Delay in Minutes
+# TODO: explain why (now it's dropped to simplify the analysis)
 data = data %>% drop_na(Arrival_Delay_in_Minutes)
 
+sat = data$satisfaction
+features_names = names(data)
 
+num_cols = 4
+num_rows = ceiling(ncol(data)/num_cols)
+par(mfrow = c(num_rows, num_cols))
 
-
+# for each feature plot the density of satisfied and dissatisfied customers
+for(col in features_names) {
+  # calculate number of breaks
+  num_breaks = length(unique(data[[col]]))
+  num_breaks = min(num_breaks, 20)
+  hist_data = hist(data[[col]], breaks = num_breaks,
+    main = paste("Histogram of ", col), xlab = col, ylab = "Frequency",
+    col = "lightblue"
+  )
+}
 
 
 # DATA BALANCE: quite balanced
 prop.table(table(data$satisfaction))
 
-
-
-
-
-
+# Create a histogram with different colors for each category
+ggplot(data, aes(x = satisfaction, fill = factor(Customer_Type))) +
+  geom_histogram(binwidth = 0.5, position = "dodge") +
+  scale_fill_manual(values = rainbow(length(unique(data$Customer_Type))), 
+                    labels = unique(data$Customer_Type),
+                    name = "Customer Type") +
+  labs(title = "Histogram of Satisfaction by Category", x = "Satisfaction", y = "Count")
 
 # Train-test split
 set.seed(123)
-train_test_split_rate = 0.8
-train_index = sample(1:nrow(data), train_test_split_rate*nrow(data))
+train_index = sample(1:nrow(data), 0.8*nrow(data))
 # 80% of data is used for training
 train = data[train_index,]
 # 20% of data is used for testing
@@ -70,14 +83,10 @@ data = rbind(train, test)
 #save on cvs
 write.csv(data, file = "data.csv")
 
-# print dimension of train and test data
-dim(train)
-dim(test)
-
 # save true values of test satisfaction column
 test_true = test$satisfaction
 
-# remove satisfaction column from test data
+# drop satisfaction column from test data
 test = test %>% select(-satisfaction)
 
 # print proportion of satisfied and dissatisfied customers in train and test data
@@ -96,17 +105,11 @@ prop.table(table(test_true))
 
 # DATA ANALYSIS
 
-# save satisfaction column of train data
-train_satisfaction = train$satisfaction
-
 # correlation matrix only for numeric variables
-correlation_matrix = cor(train[, sapply(train, is.numeric)])
-
-# plot correlation matrix
-corrplot(correlation_matrix, method = "circle")
+correlation_matrix = cor(data[, sapply(data, is.numeric)])
 
 # Plot a heatmap of the correlation matrix
-ggplot(data = reshape2::melt(corr)) +
+ggplot(data = reshape2::melt(correlation_matrix)) +
   geom_tile(aes(x = Var1, y = Var2, fill = value)) +
   scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
                        midpoint = 0, limit = c(-1,1), space = "Lab",
@@ -115,12 +118,10 @@ ggplot(data = reshape2::melt(corr)) +
                                     size = 10, hjust = 1)) +
   coord_fixed()
 
- # Find the high correlation features
+# Find the high correlation features
 #NOTE: i decided to use 0.3 as threshold
-satisfaction_corr <- corr['satisfaction',]
+satisfaction_corr <- correlation_matrix['satisfaction',]
 high_corr_features <- names(satisfaction_corr[abs(satisfaction_corr) > 0.3 | abs(satisfaction_corr) < -0.3])
-
-
 
 
 
@@ -144,56 +145,69 @@ ggplot(correlations, aes(x = reorder(feature, correlation), y = correlation)) +
 write.csv(correlations, file = "correlations.csv")
 
 #satisfaction
-sat = train$satisfaction
+sat = data$satisfaction
+features_names = names(data)
 
+num_cols = 4
+num_rows = ceiling(ncol(data)/num_cols)
+par(mfrow = c(num_rows, num_cols))
+
+# for each feature plot the density of satisfied and dissatisfied customers
+for(col in features_names) {
+  # calculate number of breaks
+  num_breaks = length(unique(data[[col]]))
+  num_breaks = min(num_breaks, 20) 
+  hist(data[[col]], breaks = num_breaks,
+    main = paste("Histogram of ", col), xlab = col, ylab = "Frequency",
+    col = "lightblue"
+  )
+}
 
 #plot the density of columns of data which names are in correlations. use barplots.
 
+#TODO: make them visually right.
+
+hist(train$Type_of_Travel, breaks = 2, col = "blue", xlab = "Type_of_Travel", main = "Type_of_Travel - Density Plot")
+
+a = ggplot(train, aes(x = Type_of_Travel, fill = sat)) +
+  geom_histogram(fill = 'Blue', alpha = 0.4, bins = 2) 
 
 
-a = ggplot(train, aes(x = Type_of_Travel, fill = satisfaction)) +
+b = ggplot(train, aes(x = Class, fill = sat)) +
   geom_bar(fill = 'Blue', alpha = 0.4) +
-  ggtitle("Type of Travel - Density Plot") +
-  xlab('Type of Travel')
-
-
-b = ggplot(train, aes(x = Class, fill = satisfaction)) +
-  geom_density(fill = 'Blue', alpha = 0.4) +
   ggtitle("Class - Density Plot") +
   xlab('Class')
 
-c = ggplot(train, aes(x = Online_boarding, fill = satisfaction)) +
-  geom_density(fill = 'Blue', alpha = 0.4) +
+c = ggplot(train, aes(x = Online_boarding, fill = sat)) +
+  geom_bar(fill = 'Blue', alpha = 0.4) +
   ggtitle("Online_boarding - Density Plot") +
   xlab('Online_boarding')
 
-d = ggplot(train, aes(x = Seat_comfort, fill = satisfaction)) +
-  geom_density(fill = 'Blue', alpha = 0.4) +
+d = ggplot(train, aes(x = Seat_comfort, fill = sat)) +
+  geom_bar(fill = 'Blue', alpha = 0.4) +
   ggtitle("Seat_comfort - Density Plot") +
   xlab('Seat_comfort')
 
-e = ggplot(train, aes(x = Inflight_entertainment, fill = satisfaction)) +
-  geom_density(fill = 'Blue', alpha = 0.4) +
+e = ggplot(train, aes(x = Inflight_entertainment, fill = sat)) +
+  geom_bar(fill = 'Blue', alpha = 0.4) +
   ggtitle("Inflight_entertainment - Density Plot") +
   xlab('Inflight_entertainment')
 
-f = ggplot(train, aes(x = On_board_service, fill = satisfaction)) +
-  geom_density(fill = 'Blue', alpha = 0.4) +
+f = ggplot(train, aes(x = On_board_service, fill = sat)) +
+  geom_bar(fill = 'Blue', alpha = 0.4) +
   ggtitle("On_board_service - Density Plot") +
   xlab('On_board_service')
 
 
-g = ggplot(train, aes(x = Leg_room_service, fill = satisfaction)) +
-  geom_density(fill = 'Blue', alpha = 0.4) +
+g = ggplot(train, aes(x = Leg_room_service, fill = sat)) +
+  geom_bar(fill = 'Blue', alpha = 0.4) +
   ggtitle("Leg_room_service - Density Plot") +
   xlab('Leg_room_service')
 
-h = ggplot(train, aes(x = Cleanliness, fill = satisfaction)) +
-  geom_density(fill = 'Blue', alpha = 0.4) +
+h = ggplot(train, aes(x = Cleanliness, fill = sat)) +
+  geom_bar(fill = 'Blue', alpha = 0.4) +
   ggtitle("Cleanliness - Density Plot") +
   xlab('Cleanliness')
-
-
 
 
 grid.arrange(a, b, c, d, e, f, g, h, ncol = )
@@ -204,34 +218,6 @@ grid.arrange(a, b, c, d, e, f, g, h, ncol = )
 #So we look for all the correlations between variables
 #We pick the highest, setting a treshold of our choice
 
-library(ppcor)
-#we need to use correlation
-# Compute partial correlations
-correlated <- pcor(train, method = "pearson")
-
-# Extract lower triangle of correlation matrix and convert to data frame
-correlated_df <- as.data.frame(correlated$estimate)
-
-#print row names
-colnames(correlated_df)
-rownames(correlated_df)
-correlated_df
-
-#plot the correlation matrix
-corrplot(correlated$estimate, method = "circle")
-
-# find values of correlations higher than 0.3 or lower than -0.3 and save them in a dataframe with row names and column names
-correlated_df <- subset(correlated_df, abs(correlated_df) > 0.3)
-correlated_df <- as.data.frame(as.table(correlated_df))
-
-
-correlated_df
-
-saveRDS(correlated, "correlated.rds")
-
-
-
-
 #build a dataframe where for each variable we look the partial correlation with all the others
 #we pick the highest and we save it in a dataframe
 #we set a treshold of 0
@@ -239,8 +225,10 @@ saveRDS(correlated, "correlated.rds")
 
 #correlation(train, partial=TRUE, method='pearson')
 #save the partial correlation matrix result in a dataframe and output a file for further analysis
-partial_corr <- correlation(train, partial=TRUE, method='pearson')
-write.csv(partial_corr, file = "partial_corr.csv")
+
+
+#partial_corr <- correlation(train, partial=TRUE, method='pearson')
+#write.csv(partial_corr, file = "partial_corr.csv")
 
 partial_correlations = read.csv("partial_corr.csv", header = TRUE, sep = ",")
 
@@ -281,7 +269,7 @@ for (i in 1:nrow(partial_correlations_rounded)) {
 
 
 # Group the data frame by variable1 and extract top 3 values for each group
-df_top3 <- df %>% group_by(variable1) %>% top_n(3, value) %>% ungroup()
+df_top3 <- df %>% group_by(variable1) %>% top_n(4, value) %>% ungroup()
 
 #order by variable1
 df_top3 <- df_top3[order(df_top3$variable1),]
@@ -295,3 +283,17 @@ print(df_top3, n = nrow(df_top3))
 write.csv(df_top3, file = "df_top3.csv")
 
 
+#TODO:EXPLAIN THE CORRELATIONS AND PLOTTING THE RESULTS 
+
+#Relations Map for Features
+
+
+
+#LOGISTIC REGRESSION MODELS
+# Fit the logistic regression model
+features = colnames(partial_correlations)
+model <- glm(formula = formula("satisfaction ~  -Gender -Customer_type -Age -Type_of_Travel"), data = train, family = binomial)
+
+
+# View the model summary
+summary(model)
