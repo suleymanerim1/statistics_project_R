@@ -14,27 +14,38 @@ data_test = read.csv("test.csv")
 data = rbind(data_train, data_test)
 attach(data)
 
-par(mfrow = c(1, 1))
-
-
 # DATA PREPROCESSING
+
 # replace dots with underscores in column names
 names(data) = gsub("\\.", "_", names(data))
 
 # drop X and id column
-#TODO: explain why
 data = data %>% select(-X, -id)
 
-# convert gender to numeric and then to factor
-data$Gender = as.factor(data$Gender)
-# change type of customer to 0 and disloyal customer to 1
+# convert categorical features to factor
+data$Gender = factor(data$Gender, levels = c("Male", "Female"))
 data$Customer_Type = factor(data$Customer_Type, levels = c("Loyal Customer", "disloyal Customer"))
-# change type of tr avel to 0 and personal travel to 1
 data$Type_of_Travel = factor(data$Type_of_Travel, levels = c("Personal Travel", "Business travel"))
-# change class Business is 2, Eco Plus is 1 and Eco is 0
 data$Class = factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))
 data$satisfaction = factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))
 
+######################################################
+
+#   HANDLING NA VALUES
+
+# list features with na values
+prop.table(colSums(is.na(data)))
+
+# Arrival_Delay_in_Minutes has na values, proportion of na values
+prop.table(table(is.na(data$Arrival_Delay_in_Minutes)))
+
+# na values are only 0.03% of the data -> drop na values
+data = data %>% drop_na(Arrival_Delay_in_Minutes)
+
+
+######################################################à
+
+#   VISUALIZATION 
 
 # plots categorical variables vs satisfaction
 plots = list()
@@ -57,11 +68,42 @@ for (col in names(data)[sapply(data, is.factor)]) {
 
 grid.arrange(grobs = plots, ncol = 2)
 
+##################
+
+# plots numeric variables vs satisfaction
+plots = list()
+# iterate numeric features
+for (col in names(data)[sapply(data, is.numeric)]) {
+  # skip satisfaction
+  if (col == "satisfaction") {
+    next
+  }
+  plot = ggplot(data, aes(x = satisfaction, y = .data[[col]])) +
+  geom_boxplot() +
+  labs(x = "Satisfaction", y = col)
+
+  plots[[col]] = plot
+  
+}
+
+grid.arrange(grobs = plots, ncol = 4)
+
+#############################################
 
 
-# drop na values in Arrival Delay in Minutes
-# TODO: explain why (now it's dropped to simplify the analysis)
-data = data %>% drop_na(Arrival_Delay_in_Minutes)
+#############################################
+
+#   CONVERT CATEGORICAL TO NUMERIC
+
+data$Gender = as.numeric(data$Gender) - 1
+data$Customer_Type = as.numeric(data$Customer_Type) - 1
+data$Type_of_Travel = as.numeric(data$Type_of_Travel) - 1
+data$Class = as.numeric(data$Class) - 1
+data$satisfaction = as.numeric(data$satisfaction) - 1
+
+#############################################
+
+
 
 sat = data$satisfaction
 features_names = names(data)
@@ -79,6 +121,7 @@ for(col in features_names) {
     main = paste("Histogram of ", col), xlab = col, ylab = "Frequency",
     col = "lightblue"
   )
+  print(hist_data)
 }
 
 
