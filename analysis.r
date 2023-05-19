@@ -47,11 +47,36 @@ data = data %>% drop_na(Arrival_Delay_in_Minutes)
 
 #   VISUALIZATION 
 
+# plot distribution of categorical variables
+plots = list()
+for (col in names(data)[sapply(data, is.factor)]) {
+  plot = ggplot(data, aes(x = .data[[col]], fill = .data[[col]])) +
+  geom_bar() +
+  labs(title = paste("Histogram of", col), x = col, y = "Count")
+
+  plots[[col]] = plot
+}
+
+grid.arrange(grobs = plots, ncol = 2)
+
+##################
+
+# plot distribution of numeric variables
+plots = list()
+for (col in names(data)[sapply(data, is.numeric)]) {
+  plot = ggplot(data, aes(x = .data[[col]])) +
+  geom_histogram() +
+  labs(title = col, x = col, y = "Count") 
+  plots[[col]] = plot
+}
+
+grid.arrange(grobs = plots, ncol = 3)
+
+##################
+
 # plots categorical variables vs satisfaction
 plots = list()
-# iterate factor features
 for (col in names(data)[sapply(data, is.factor)]) {
-  # skip satisfaction
   if (col == "satisfaction") {
     next
   }
@@ -72,9 +97,7 @@ grid.arrange(grobs = plots, ncol = 2)
 
 # plots numeric variables vs satisfaction
 plots = list()
-# iterate numeric features
 for (col in names(data)[sapply(data, is.numeric)]) {
-  # skip satisfaction
   if (col == "satisfaction") {
     next
   }
@@ -90,9 +113,6 @@ grid.arrange(grobs = plots, ncol = 4)
 
 #############################################
 
-
-#############################################
-
 #   CONVERT CATEGORICAL TO NUMERIC
 
 data$Gender = as.numeric(data$Gender) - 1
@@ -103,40 +123,14 @@ data$satisfaction = as.numeric(data$satisfaction) - 1
 
 #############################################
 
+#   DATA BALANCE
 
-
-sat = data$satisfaction
-features_names = names(data)
-
-num_cols = 4
-num_rows = ceiling(ncol(data)/num_cols)
-par(mfrow = c(num_rows, num_cols))
-
-# for each feature plot the density of satisfied and dissatisfied customers
-for(col in features_names) {
-  # calculate number of breaks
-  num_breaks = length(unique(data[[col]]))
-  num_breaks = min(num_breaks, 20)
-  hist_data = hist(data[[col]], breaks = num_breaks,
-    main = paste("Histogram of ", col), xlab = col, ylab = "Frequency",
-    col = "lightblue"
-  )
-  print(hist_data)
-}
-
-
-# DATA BALANCE: quite balanced
 prop.table(table(data$satisfaction))
 
-# Create a histogram with different colors for each category
-ggplot(data, aes(x = satisfaction, fill = factor(Customer_Type))) +
-  geom_bar(binwidth = 0.5, position = "dodge") +
-  scale_fill_manual(values = rainbow(length(unique(data$Customer_Type))), 
-                    labels = unique(data$Customer_Type),
-                    name = "Customer Type") +
-  labs(title = "Histogram of Satisfaction by Category", x = "Satisfaction", y = "Count")
+##############################################
 
-# Train-test split
+#  TRAIN TEST SPLIT
+
 set.seed(123)
 train_index = sample(1:nrow(data), 0.8*nrow(data))
 # 80% of data is used for training
@@ -159,17 +153,9 @@ test = test %>% select(-satisfaction)
 prop.table(table(train$satisfaction))
 prop.table(table(test_true))
 
+##############################################
 
-
-
-
-
-
-
-
-
-
-# DATA ANALYSIS
+# CORRELATION MATRIX
 
 # correlation matrix only for numeric variables
 correlation_matrix = cor(data[, sapply(data, is.numeric)])
@@ -184,21 +170,22 @@ ggplot(data = reshape2::melt(correlation_matrix)) +
                                     size = 10, hjust = 1)) +
   coord_fixed()
 
-# Find the high correlation features
-#NOTE: i decided to use 0.3 as threshold
+# Find high correlated features with satisfaction
+# NOTE: i decided to use 0.3 as threshold
 satisfaction_corr <- correlation_matrix['satisfaction',]
-high_corr_features <- names(satisfaction_corr[abs(satisfaction_corr) > 0.3 | abs(satisfaction_corr) < -0.3])
-
+high_corr_satis <- names(satisfaction_corr[abs(satisfaction_corr) > 0.3 | abs(satisfaction_corr) < -0.3])
+high_corr_satis <- high_corr_satis[high_corr_satis != "satisfaction"]
+high_corr_satis
 
 
 # Compute the correlations between the high correlation features and satisfaction
 correlations <- data.frame(
-  feature = high_corr_features,
-  correlation = sapply(high_corr_features, function(x) cor(data[,x], data$satisfaction))
+  feature = high_corr_satis,
+  correlation = sapply(high_corr_satis, function(x) cor(data[,x], data$satisfaction))
 )
-
 correlations
-#plot the correlations
+
+# plot the correlations
 ggplot(correlations, aes(x = reorder(feature, correlation), y = correlation)) +
   geom_bar(stat = "identity", fill = "blue", alpha = 0.4) +
   ggtitle("Correlation between features and satisfaction") +
@@ -206,11 +193,13 @@ ggplot(correlations, aes(x = reorder(feature, correlation), y = correlation)) +
   ylab('Correlation')
 
 
-
 #save on cvs
 write.csv(correlations, file = "correlations.csv")
 
-#satisfaction
+##############################################
+
+# PLOT ALL DISTRIBUTIONS (with numerical categories)
+
 sat = data$satisfaction
 features_names = names(data)
 
@@ -351,7 +340,25 @@ write.csv(df_top3, file = "df_top3.csv")
 
 #TODO:EXPLAIN THE CORRELATIONS AND PLOTTING THE RESULTS 
 
-#Relations Map for Features
+par(mfrow = c(1, 1))
+
+### Relation between Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes (linear)
+# standardize Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes
+arrival_std = scale(data$Arrival_Delay_in_Minutes)
+departure_std = scale(data$Departure_Delay_in_Minutes)
+# scatter plot of Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes 
+plot(arrival_std, departure_std, xlab = "Arrival_Delay_in_Minutes", ylab = "Departure_Delay_in_Minutes")
+# plot line y = x
+abline(0, 1, col = "red")
+
+### Relationship between Class (Business, Eco, Eco Plus) and Type of travel (Personal Travel, Business Travel)
+
+# plot barplot coloured for each type of class vs type of travel
+ggplot(data, aes(x = Class, fill = Type_of_Travel)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Histogram of Class by Type of Travel", x = "Class", y = "Count")
+
+
 
 
 
