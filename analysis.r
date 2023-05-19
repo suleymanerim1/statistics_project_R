@@ -26,14 +26,37 @@ names(data) = gsub("\\.", "_", names(data))
 data = data %>% select(-X, -id)
 
 # convert gender to numeric and then to factor
-data$Gender = as.numeric(as.factor(data$Gender)) -1
+data$Gender = as.factor(data$Gender)
 # change type of customer to 0 and disloyal customer to 1
-data$Customer_Type = as.numeric(factor(data$Customer_Type, levels = c("Loyal Customer", "disloyal Customer"))) - 1
+data$Customer_Type = factor(data$Customer_Type, levels = c("Loyal Customer", "disloyal Customer"))
 # change type of tr avel to 0 and personal travel to 1
-data$Type_of_Travel = as.numeric(factor(data$Type_of_Travel, levels = c("Personal Travel", "Business travel"))) - 1
+data$Type_of_Travel = factor(data$Type_of_Travel, levels = c("Personal Travel", "Business travel"))
 # change class Business is 2, Eco Plus is 1 and Eco is 0
-data$Class = as.numeric(factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))) - 1
-data$satisfaction = as.numeric(factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))) - 1
+data$Class = factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))
+data$satisfaction = factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))
+
+
+# plots categorical variables vs satisfaction
+plots = list()
+# iterate factor features
+for (col in names(data)[sapply(data, is.factor)]) {
+  # skip satisfaction
+  if (col == "satisfaction") {
+    next
+  }
+  plot = ggplot(data, aes(x = satisfaction, fill = .data[[col]])) +
+  geom_bar(position = "dodge") +
+  scale_fill_manual(values = rainbow(length(unique(data[[col]]))), 
+                    labels = unique(data[[col]]),
+                    name = col) +
+  labs(title = paste("Histogram of Satisfaction by", col), x = "Satisfaction", y = "Count")
+
+  plots[[col]] = plot
+  
+}
+
+grid.arrange(grobs = plots, ncol = 2)
+
 
 
 # drop na values in Arrival Delay in Minutes
@@ -64,7 +87,7 @@ prop.table(table(data$satisfaction))
 
 # Create a histogram with different colors for each category
 ggplot(data, aes(x = satisfaction, fill = factor(Customer_Type))) +
-  geom_histogram(binwidth = 0.5, position = "dodge") +
+  geom_bar(binwidth = 0.5, position = "dodge") +
   scale_fill_manual(values = rainbow(length(unique(data$Customer_Type))), 
                     labels = unique(data$Customer_Type),
                     name = "Customer Type") +
