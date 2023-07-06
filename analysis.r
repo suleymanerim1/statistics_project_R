@@ -449,7 +449,4 @@ model <- glm(formula = formula("satisfaction ~  -Gender -Customer_type -Age -Typ
 # View the model summary
 summary(model)
 
-for (col in names(data)) {
-  print(col)
-  print(by(data[[col]], data$satisfaction, summary))
-}
+

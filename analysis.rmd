@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ``` 
 # Libraries
 
-```{r}
+```{r message=FALSE}
 # import libraries
 library(tidyverse)
 library(corrplot)
@@ -31,7 +31,8 @@ data = rbind(data_train, data_test)
 attach(data)
 ```
 
-### DATA PREPROCESSING
+# DATA PREPROCESSING
+Here we create factors from categorical variables
 ```{r}
 # replace dots with underscores in column names
 names(data) = gsub("\\.", "_", names(data))
@@ -46,29 +47,24 @@ data$Type_of_Travel = factor(data$Type_of_Travel, levels = c("Personal Travel", 
 data$Class = factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))
 data$satisfaction = factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))
 
-######################################################
 ```
 
-###   HANDLING NA VALUES
+# HANDLING NA VALUES
 ```{r}
 # list features with na values
 prop.table(colSums(is.na(data)))
+```
 
+From here we can see that Arrival_Delay_in_Minutes has missing values, let's the proportion of na values
+```{r}
 # Arrival_Delay_in_Minutes has na values, proportion of na values
 prop.table(table(is.na(data$Arrival_Delay_in_Minutes)))
 
 # na values are only 0.03% of the data -> drop na values
 data = data %>% drop_na(Arrival_Delay_in_Minutes)
-
-
-######################################################
-# Print summary for each variable grouped by satisfaction, including the name of the variable
-for (col in names(data)) {
-  print(col)
-  print(by(data[[col]], data$satisfaction, summary))
-}
-######################################################
 ```
+It turns out that Arrival_Delay_in_Minutes has only 0.03% of na values.
+
 ### OUTLIERS
 ```{r}
 # plot boxplot of numeric variables
@@ -123,9 +119,11 @@ for (col in names(data)[sapply(data, is.factor)]) {
   plots[[col]] = plot
 }
 
-grid.arrange(grobs = plots, ncol = 2)
+grid.arrange(grobs = plots, ncol = 3)
+```
 
 
+```{r}
 # plot distribution of categorical variables
 plots = list()
 for (col in names(data)[sapply(data, is.factor)]) {
@@ -137,9 +135,10 @@ for (col in names(data)[sapply(data, is.factor)]) {
 }
 
 grid.arrange(grobs = plots, ncol = 2)
+```
 
-##################
 
+```{r}
 # plot distribution of numeric variables
 plots = list()
 for (col in names(data)[sapply(data, is.numeric)]) {
@@ -150,9 +149,10 @@ for (col in names(data)[sapply(data, is.numeric)]) {
 }
 
 grid.arrange(grobs = plots, ncol = 3)
+```
 
-##################
 
+```{r}
 # plots categorical variables vs satisfaction
 plots = list()
 for (col in names(data)[sapply(data, is.factor)]) {
@@ -171,7 +171,10 @@ for (col in names(data)[sapply(data, is.factor)]) {
 }
 
 grid.arrange(grobs = plots, ncol = 2)
+```
 
+
+```{r}
 # Create density plots for Age and Flight_Distance
 plots = list()
 for (col in c("Age", "Flight_Distance")) {
@@ -184,8 +187,10 @@ for (col in c("Age", "Flight_Distance")) {
 # Arrange the density plots in a grid
 grid.arrange(grobs = plots)
 
-######################################################
+```
 
+
+```{r}
 # plots numeric variables vs satisfaction
 plots = list()
 for (col in names(data)[sapply(data, is.numeric)]) {
@@ -201,9 +206,9 @@ for (col in names(data)[sapply(data, is.numeric)]) {
 }
 
 grid.arrange(grobs = plots, ncol = 4)
-
-#############################################
 ```
+
+
 ###   CONVERT CATEGORICAL TO NUMERIC
 ```{r}
 data$Gender = as.numeric(data$Gender) - 1
@@ -292,6 +297,16 @@ write.csv(correlations, file = "correlations.csv")
 ```
 ### PLOT ALL DISTRIBUTIONS (with numerical categories)
 ```{r}
+
+```
+
+
+```{r}
+par(mar=c(1,1,1,1))
+```
+
+
+```{r}
 sat = data$satisfaction
 features_names = names(data)
 
@@ -310,6 +325,8 @@ for(col in features_names) {
   )
 }
 
+
+
 #plot the density of columns of data which names are in correlations. Use barplots.
 
 #TODO: make them visually right.
@@ -317,13 +334,10 @@ for(col in features_names) {
 
 # Count frequence of value of Type_of_Travel
 
-frequency <- table(train$Type_of_Travel)
-
-# Create a barplot
-barplot(frequency, col = "blue", xlab = "Type_of_Travel", ylab = "Frequency", main = "Type_of_Travel - Frequency Plot")
+```
 
 
-
+```{r}
 
 a = ggplot(train, aes(x = Type_of_Travel, fill = sat)) +
   geom_histogram(fill = 'Blue', alpha = 0.4, bins = 2) 
@@ -366,9 +380,23 @@ h = ggplot(train, aes(x = Cleanliness, fill = sat)) +
   xlab('Cleanliness')
 
 
-grid.arrange(a, b, c, d, e, f, g, h, ncol = )
+grid.arrange(a, b, c, d, e, f, g, h, ncol = 3)
 
 
+```
+
+
+```{r}
+par(mfrow = c(1, 1))
+
+frequency <- table(train$Type_of_Travel)
+
+# Create a barplot
+barplot(frequency, col = "blue", xlab = "Type_of_Travel", ylab = "Frequency", main = "Type_of_Travel - Frequency Plot")
+
+```
+### Relation between Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes (linear)
+```{r}
 
 #CORRELATION MATRIX again but now we are interested in partial correlation
 #So we look for all the correlations between variables
@@ -437,13 +465,7 @@ df_top3 <- df_top3[!(df_top3$variable1 == df_top3$variable2),]
 print(df_top3, n = nrow(df_top3))
 #save on cvs
 write.csv(df_top3, file = "df_top3.csv")
-
-
-#TODO:EXPLAIN THE CORRELATIONS AND PLOTTING THE RESULTS 
-
-par(mfrow = c(1, 1))
 ```
-### Relation between Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes (linear)
 
 ```{r}
 # standardize Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes
