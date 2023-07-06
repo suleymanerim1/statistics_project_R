@@ -43,69 +43,9 @@ prop.table(table(is.na(data$Arrival_Delay_in_Minutes)))
 data = data %>% drop_na(Arrival_Delay_in_Minutes)
 
 
-######################################################
-# Print summary for each variable grouped by satisfaction, including the name of the variable
-for (col in names(data)) {
-  print(col)
-  print(by(data[[col]], data$satisfaction, summary))
-}
-######################################################
+######################################################à
 
-### OUTLIERS
-
-# plot boxplot of numeric variables
-plots = list()
-for (col in names(data)[sapply(data, is.numeric)]) {
-  plot = ggplot(data, aes(x = .data[[col]])) +
-  geom_boxplot() +
-  labs(title = col, x = col, y = "Count") 
-  plots[[col]] = plot
-}
-
-grid.arrange(grobs = plots, ncol = 3)
-
-# plot boxplot against satisfaction with colors
-plots = list()
-for (col in names(data)[sapply(data, is.numeric)]) {
-  plot = ggplot(data, aes(x = satisfaction, y = .data[[col]], fill = satisfaction)) +
-  geom_boxplot() +
-  labs(title = col, x = "Satisfaction", y = col) 
-  plots[[col]] = plot
-}
-
-grid.arrange(grobs = plots, ncol = 2)
-
-###################################################################
-
-# select examples of departure delay greater than 500
-examples=data[data$Departure_Delay_in_Minutes > 800,] 
-# and print table of satisfaction by departure delay
-table(examples$satisfaction)
-
-# count the number of examples with departure delay = 0
-sum(data$Departure_Delay_in_Minutes > 0)
-sum(data$Departure_Delay_in_Minutes <= 0)
-
-sum(data$Arrival_Delay_in_Minutes > 0)
-sum(data$Arrival_Delay_in_Minutes <= 0)
-
-summary(data)
-
-######################################################
 #   VISUALIZATION 
-
-# plot pie chart for each variable
-plots = list()
-for (col in names(data)[sapply(data, is.factor)]) {
-  plot = ggplot(data, aes(x = "", fill = .data[[col]])) +
-  geom_bar(width = 1) +
-  coord_polar("y", start = 0) +
-  labs(title = paste("Pie Chart of", col))
-  plots[[col]] = plot
-}
-
-grid.arrange(grobs = plots, ncol = 2)
-
 
 # plot distribution of categorical variables
 plots = list()
@@ -153,19 +93,7 @@ for (col in names(data)[sapply(data, is.factor)]) {
 
 grid.arrange(grobs = plots, ncol = 2)
 
-# Create density plots for Age and Flight_Distance
-plots = list()
-for (col in c("Age", "Flight_Distance")) {
-  plot = ggplot(data, aes(x = .data[[col]], fill = satisfaction)) +
-  geom_density(alpha = 0.4) +
-  labs(title = paste("Density Plot of", col), x = col, y = "Density") 
-  plots[[col]] = plot
-}
-
-# Arrange the density plots in a grid
-grid.arrange(grobs = plots)
-
-######################################################
+##################
 
 # plots numeric variables vs satisfaction
 plots = list()
@@ -243,7 +171,6 @@ ggplot(data = reshape2::melt(correlation_matrix)) +
   coord_fixed()
 
 # Find high correlated features with satisfaction
-# TODO: do the same with different threshold to find differences
 # NOTE: i decided to use 0.3 as threshold
 satisfaction_corr <- correlation_matrix['satisfaction',]
 high_corr_satis <- names(satisfaction_corr[abs(satisfaction_corr) > 0.3 | abs(satisfaction_corr) < -0.3])
@@ -291,20 +218,11 @@ for(col in features_names) {
   )
 }
 
-#plot the density of columns of data which names are in correlations. Use barplots.
+#plot the density of columns of data which names are in correlations. use barplots.
 
 #TODO: make them visually right.
-#DONE
 
-# Count frequence of value of Type_of_Travel
-
-frequency <- table(train$Type_of_Travel)
-
-# Create a barplot
-barplot(frequency, col = "blue", xlab = "Type_of_Travel", ylab = "Frequency", main = "Type_of_Travel - Frequency Plot")
-
-
-
+hist(train$Type_of_Travel, breaks = 2, col = "blue", xlab = "Type_of_Travel", main = "Type_of_Travel - Density Plot")
 
 a = ggplot(train, aes(x = Type_of_Travel, fill = sat)) +
   geom_histogram(fill = 'Blue', alpha = 0.4, bins = 2) 
@@ -444,17 +362,11 @@ ggplot(data, aes(x = Class, fill = Type_of_Travel)) +
 
 
 
-#######################################################àà
-
-#VARIABLE DESCRIPTION
-
-# Print summary for each variable grouped by satisfaction, including the name of the variable
-for (col in names(data)) {
-  print(col)
-  print(by(data[[col]], data$satisfaction, summary))
-}
+#LOGISTIC REGRESSION MODELS
+# Fit the logistic regression model
+features = colnames(partial_correlations)
+model <- glm(formula = formula("satisfaction ~  -Gender -Customer_type -Age -Type_of_Travel"), data = train, family = binomial)
 
 
-
-# print table of type of travel by satisfaction
-table(data$Type_of_Travel, data$satisfaction)
+# View the model summary
+summary(model)
