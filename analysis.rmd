@@ -10,8 +10,12 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-``` 
+```
+
 # Introduction to data
+
+This section introduces the purpose of the exploratory data analysis
+(EDA) and sets up the necessary libraries and data files.
 
 ```{r message=FALSE}
 # import libraries
@@ -30,7 +34,12 @@ data_test = read.csv("test.csv")
 data = rbind(data_train, data_test)
 attach(data)
 ```
-### VARIABLE DESCRIPTION
+
+# Variable description
+
+This section provides a summary of each variable in the dataset, grouped
+by the target variable (satisfaction).
+
 ```{r}
 # Print summary for each variable grouped by satisfaction, including the name of the variable
 for (col in names(data)) {
@@ -44,8 +53,12 @@ for (col in names(data)) {
 names(data)
 ```
 
-# DATA PREPROCESSING
-Here we create factors from categorical variables
+# Data preprocessing
+
+This section performs data preprocessing steps such as renaming columns,
+dropping unnecessary columns, and converting categorical variables to
+factors.
+
 ```{r}
 # replace dots with underscores in column names
 names(data) = gsub("\\.", "_", names(data))
@@ -56,7 +69,6 @@ data = data %>% select(-X, -id)
 names(data)
 ```
 
-
 ```{r}
 # convert categorical features to factor
 data$Gender = factor(data$Gender, levels = c("Male", "Female"))
@@ -65,66 +77,61 @@ data$Type_of_Travel = factor(data$Type_of_Travel, levels = c("Personal Travel", 
 data$Class = factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))
 data$satisfaction = factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))
 ```
-# HANDLING NA VALUES
+
+# Handling na values
+
+This section identifies the variables with missing values and calculates
+the proportion of missing values for the "Arrival_Delay_in_Minutes"
+variable. It then drops the examples with missing values.
+
 ```{r}
 # list features with na values
 prop.table(colSums(is.na(data)))
 ```
 
-From here we can see that Arrival_Delay_in_Minutes has missing values, let's the proportion of na values
+From here we can see that Arrival_Delay_in_Minutes has missing values,
+let's the proportion of na values
+
 ```{r}
 # Arrival_Delay_in_Minutes has na values, proportion of na values
 prop.table(table(is.na(data$Arrival_Delay_in_Minutes)))
+```
 
+```{r}
 # na values are only 0.03% of the data -> drop na values
 data = data %>% drop_na(Arrival_Delay_in_Minutes)
 ```
-It turns out that Arrival_Delay_in_Minutes has only 3% of na values so we drop this examples.
 
-### OUTLIERS
-```{r fig.height=50}
-# plot boxplot of numeric variables
+# Outliers
+
+This section creates box plots for each numeric variable in the dataset
+to visualize the presence of outliers. It also compares the box plots
+against the target variable (satisfaction).
+
+```{r}
+ratings_fts_names = c("Inflight_wifi_service", "Departure_Arrival_time_convenient", 
+  "Ease_of_Online_booking", "Gate_location", "Food_and_drink", "Online_boarding", 
+  "Seat_comfort", "Inflight_entertainment", "On-board_service", "Leg_room_service", 
+  "Baggage_handling", "Checkin_service", "Inflight_service", "Cleanliness", "On_board_service")
+# plot boxplot of each numeric variable excluding ratings features
 plots = list()
 for (col in names(data)[sapply(data, is.numeric)]) {
+  if (col %in% ratings_fts_names) {
+    next
+  }
   plot = ggplot(data, aes(x = .data[[col]])) +
   geom_boxplot() +
   labs(title = col, x = col, y = "Count") 
   plots[[col]] = plot
 }
 
-grid.arrange(grobs = plots, ncol = 3)
-```
-
-
-```{r fig.height=20}
-# plot boxplot against satisfaction with colors
-plots = list()
-for (col in names(data)[sapply(data, is.numeric)]) {
-  plot = ggplot(data, aes(x = satisfaction, y = .data[[col]], fill = satisfaction)) +
-  geom_boxplot() +
-  labs(title = col, x = "Satisfaction", y = col) 
-  plots[[col]] = plot
-}
-
 grid.arrange(grobs = plots, ncol = 2)
 ```
 
+# Visualization
 
-###   VISUALIZATION 
-```{r}
-# plot pie chart for each variable
-plots = list()
-for (col in names(data)[sapply(data, is.factor)]) {
-  plot = ggplot(data, aes(x = "", fill = .data[[col]])) +
-  geom_bar(width = 1) +
-  coord_polar("y", start = 0) +
-  labs(title = paste("Pie Chart of", col))
-  plots[[col]] = plot
-}
-
-grid.arrange(grobs = plots, ncol = 3)
-```
-
+This section includes histograms to visualize the distribution of
+categorical variables in the dataset.
 
 ```{r}
 # plot distribution of categorical variables
@@ -140,20 +147,44 @@ for (col in names(data)[sapply(data, is.factor)]) {
 grid.arrange(grobs = plots, ncol = 2)
 ```
 
+Here we plot the distribution of ratings features.
 
-```{r}
-# plot distribution of numeric variables
+```{r fig.height=10}
+# plot distribution of ratings features
 plots = list()
 for (col in names(data)[sapply(data, is.numeric)]) {
+  if (!col %in% ratings_fts_names) {
+    next
+  }
   plot = ggplot(data, aes(x = .data[[col]])) +
-  geom_histogram(binwidth = 0.5) +
-  labs(title = col, x = col, y = "Count") 
+  geom_bar() +
+  labs(title = paste("", col), x = col, y = "Count", bins=5)
+
   plots[[col]] = plot
 }
-
 grid.arrange(grobs = plots, ncol = 3)
 ```
 
+This section includes histograms to visualize the distribution of
+numeric variables in the dataset.
+
+```{r}
+# plot distribution and density of numeric variables excluding ratings features
+plots = list()
+for (col in names(data)[sapply(data, is.numeric)]) {
+  if (col %in% ratings_fts_names) {
+    next
+  }
+  plot = ggplot(data, aes(x = .data[[col]])) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, alpha = 0.5) +
+  geom_density(alpha = 0.5, fill = "red") +
+  labs(title = paste("Histogram of", col), x = col, y = "Count") 
+
+  plots[[col]] = plot
+}
+
+grid.arrange(grobs = plots, ncol = 2)
+```
 
 ```{r}
 # plots categorical variables vs satisfaction
@@ -176,24 +207,7 @@ for (col in names(data)[sapply(data, is.factor)]) {
 grid.arrange(grobs = plots, ncol = 2)
 ```
 
-
-```{r}
-# Create density plots for Age and Flight_Distance
-plots = list()
-for (col in c("Age", "Flight_Distance")) {
-  plot = ggplot(data, aes(x = .data[[col]], fill = satisfaction)) +
-  geom_density(alpha = 0.4) +
-  labs(title = paste("Density Plot of", col), x = col, y = "Density") 
-  plots[[col]] = plot
-}
-
-# Arrange the density plots in a grid
-grid.arrange(grobs = plots)
-
-```
-
-
-```{r}
+```{r fig.height=10}
 # plots numeric variables vs satisfaction
 plots = list()
 for (col in names(data)[sapply(data, is.numeric)]) {
@@ -211,8 +225,11 @@ for (col in names(data)[sapply(data, is.numeric)]) {
 grid.arrange(grobs = plots, ncol = 4)
 ```
 
+# Convert categorical to numerical
 
-###   CONVERT CATEGORICAL TO NUMERIC
+This section converts the categorical variables to numeric
+representation for further analysis.
+
 ```{r}
 data$Gender = as.numeric(data$Gender) - 1
 data$Customer_Type = as.numeric(data$Customer_Type) - 1
@@ -220,11 +237,22 @@ data$Type_of_Travel = as.numeric(data$Type_of_Travel) - 1
 data$Class = as.numeric(data$Class) - 1
 data$satisfaction = as.numeric(data$satisfaction) - 1
 ```
-###   DATA BALANCE
+
+# Data balance
+
+This section calculates the proportion of satisfied and dissatisfied
+customers in the dataset.
+
 ```{r}
 prop.table(table(data$satisfaction))
 ```
-###  TRAIN TEST SPLIT
+
+# Train test split
+
+This section splits the data into training and testing sets, prints the
+proportion of satisfied and dissatisfied customers in each set, and
+saves the true values of the target variable for the test set.
+
 ```{r}
 set.seed(123)
 train_index = sample(1:nrow(data), 0.8*nrow(data))
@@ -249,7 +277,11 @@ prop.table(table(train$satisfaction))
 prop.table(table(test_true))
 ```
 
-### CORRELATION MATRIX
+# Correlation matrix
+
+This section calculates the correlation matrix for numeric variables and
+plots a heatmap to visualize the correlations between variables.
+
 ```{r}
 # correlation matrix only for numeric variables
 correlation_matrix = cor(data[, sapply(data, is.numeric)])
@@ -265,7 +297,6 @@ ggplot(data = reshape2::melt(correlation_matrix)) +
   coord_fixed()
 ```
 
-
 ```{r}
 # Find high correlated features with satisfaction
 # TODO: do the same with different threshold to find differences
@@ -276,7 +307,6 @@ high_corr_satis <- high_corr_satis[high_corr_satis != "satisfaction"]
 high_corr_satis
 ```
 
-
 ```{r}
 # Compute the correlations between the high correlation features and satisfaction
 correlations <- data.frame(
@@ -285,7 +315,6 @@ correlations <- data.frame(
 )
 correlations
 ```
-
 
 ```{r}
 # plot the correlations
@@ -298,94 +327,17 @@ ggplot(correlations, aes(x = reorder(feature, correlation), y = correlation)) +
 par(mfrow = c(1, 1))
 ```
 
-
 ```{r}
 #save on cvs
 # write.csv(correlations, file = "correlations.csv")
 ```
 
+# Relation between Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes (linear)
 
-### PLOT ALL DISTRIBUTIONS (with numerical categories)
-```{r}
+This section explores the partial correlation matrix and identifies
+variables with high correlations with the target variable
+(satisfaction). It also creates a bar plot to show the correlations.
 
-```
-
-```{r}
-sat <- data$satisfaction
-features_names <- names(data)
-
-num_cols <- 3
-num_rows <- ceiling(length(features_names) / num_cols)
-
-# Set smaller figure margins
-par(mar = c(2, 2, 2, 2))  # Adjust the margin values as per your preference
-
-# Loop through each feature and plot the density of satisfied and dissatisfied customers
-for (col in features_names) {
-  # Calculate the number of breaks
-  num_breaks <- length(unique(data[[col]]))
-  num_breaks <- min(num_breaks, 20) 
-  
-  # Create a new plot for each feature
-  hist(data[[col]], breaks = num_breaks,
-       main = paste("Histogram of", col), xlab = col, ylab = "Frequency",
-       col = "lightblue"
-  )
-}
-
-# Reset the plotting settings to default
-par(mfrow = c(1, 1))
-
-```
-
-
-```{r}
-
-a = ggplot(train, aes(x = Type_of_Travel, fill = sat)) +
-  geom_bar(fill = 'Blue', alpha = 0.4) 
-
-
-b = ggplot(train, aes(x = Class, fill = sat)) +
-  geom_bar(fill = 'Blue', alpha = 0.4) +
-  ggtitle("Class") +
-  xlab('Class')
-
-c = ggplot(train, aes(x = Online_boarding, fill = sat)) +
-  geom_bar(fill = 'Blue', alpha = 0.4) +
-  ggtitle("Online_boarding") +
-  xlab('Online_boarding')
-
-d = ggplot(train, aes(x = Seat_comfort, fill = sat)) +
-  geom_bar(fill = 'Blue', alpha = 0.4) +
-  ggtitle("Seat_comfort") +
-  xlab('Seat_comfort')
-
-e = ggplot(train, aes(x = Inflight_entertainment, fill = sat)) +
-  geom_bar(fill = 'Blue', alpha = 0.4) +
-  ggtitle("Inflight_entertainment") +
-  xlab('Inflight_entertainment')
-
-f = ggplot(train, aes(x = On_board_service, fill = sat)) +
-  geom_bar(fill = 'Blue', alpha = 0.4) +
-  ggtitle("On_board_service") +
-  xlab('On_board_service')
-
-
-g = ggplot(train, aes(x = Leg_room_service, fill = sat)) +
-  geom_bar(fill = 'Blue', alpha = 0.4) +
-  ggtitle("Leg_room_service") +
-  xlab('Leg_room_service')
-
-h = ggplot(train, aes(x = Cleanliness, fill = sat)) +
-  geom_bar(fill = 'Blue', alpha = 0.4) +
-  ggtitle("Cleanliness") +
-  xlab('Cleanliness')
-
-
-grid.arrange(a, b, c, d, e, f, g, h, ncol = 3)
-```
-
-### Relation between Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes (linear)
 ```{r}
 
 #CORRELATION MATRIX again but now we are interested in partial correlation
