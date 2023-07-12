@@ -3,147 +3,147 @@ title: "stat_model"
 author: "Süleyman Erim, Giacomo Schiavo, Mattia Varagnolo"
 date: "`r Sys.Date()`"
 output: pdf_document
-editor_options: 
-  markdown: 
-    wrap: 72
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax
-for authoring HTML, PDF, and MS Word documents. For more details on
-using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that
-includes both content as well as the output of any embedded R code
-chunks within the document. You can embed an R code chunk like this:
-
-```{r message = FALSE}
-# import libraries
-library(MASS) #for stepAIC (stepwise)
+```{r, warning=FALSE, message = FALSE}
+# Import libraries
 library(tidyverse) # for data manipulation
-library(corrplot) # for correlation plot
 library(ggplot2) # for plotting
 library(gridExtra) # for grid.arrange
 library(correlation) # for partial correlation
-library(stats) # for anova 
-library(car) # for vif package
-library(ROCR) # for roc curve
-library(ROSE) # for oversampling (just in case)
-library(leaps) # for stepwise selection
 library(regclass) # for VIF package
 library(MLmetrics) # to create confusion matrix
 library(pROC) # for ROC Curve
 library(e1071) # for Naive Bayes Classifier
-library(rpart) # for Decision Tree
-library(randomForest) # for Random Forest
-
+library(class)
+library(caret)
+library(glmnet) # for Lasso Regression
 ```
 
+# Data Preparation
+## Import Data
 ```{r message=FALSE}
 
-#read data
-data = read.csv("data_encoded.csv")
-#drop X column
-data = data %>% select(-X)
-attach(data)
+# Read the training data from CSV file
+train_data <- read.csv("train_encoded.csv")
+
+# Drop the first column
+train_data <- train_data[, -1]
+
+# Read the test data from CSV file
+test_data <- read.csv("test_encoded.csv")
+
+# Drop the first column
+test_data <- test_data[, -1]
+
 ```
 
+## Features and Outputs
 ```{r}
 
-#train test split
-set.seed(123)
-train_index = sample(1:nrow(data), 0.8*nrow(data))
-# 80% of data is used for training
-train = data[train_index,]
-# 20% of data is used for testing
-test = data[-train_index,]
+# Seperate y_train and y_test for further use
+X_train = as.matrix(train_data %>% select(-satisfaction))
+y_train = train_data$satisfaction
 
-# Set X and Y, where Y is the target variable "satisfaction"
-X_train = train %>% select(-satisfaction)
-y_train = train$satisfaction
-
-X_test = test %>% select(-satisfaction)
-y_test = test$satisfaction
+X_test = as.matrix(test_data %>% select(-satisfaction))
+y_test = test_data$satisfaction
 ```
 
+## Number of Samples
 ```{r}
-# print proportion of satisfied and dissatisfied customers in train and test data
+# Number of samples in train data
+train_rows <- nrow(train_data)
+print(train_rows)
+
+# Number of samples in test data
+test_rows <- nrow(test_data)
+print(test_rows)
+```
+
+## Data Balance
+```{r}
+# Proportion of satisfied and unsatisfied customers for train data
 prop.table(table(y_train))
+# Proportion of satisfied and unsatisfied customers for test data
 prop.table(table(y_test))
 ```
+As we can see the proportion of binary classes in train and test are similar. We can say that our test data is representative of train data.
 
-## LOGISTIC REGRESSION
+In this project we want to find unsatisfied customers (class 0). We hypothesis that if we find the unsatisfied customers, then we arrange our customer satisfaction campaign accordingly.
 
+# Classification Models
+
+Classification, a form of supervised learning, involves predicting the qualitative response of an observation by assigning it to a specific category or class. Multivariate techniques excel in constructing prediction models, forming the foundation of statistical classification. In the realm of machine learning, this process is referred to as supervised learning.
+
+To build a classifier, we utilize a set of training observations. From a geometric perspective, an allocation rule determines how the input space is divided into regions, each labeled according to its classification. The boundaries of these regions can vary based on the assumptions made when constructing the classification model.
+
+## Logistic Regression
+
+In logistic model observations are assumed to be realizations of independent Bernoulli random variables. It is like if a customer will be satisfied with flight or not.
+
+### Basic Logistic Classifier
 ```{r}
 # Model definition with all features:
-glm_full<- glm(data = train,
-                satisfaction ~ .,
+glm_full<- glm(data = train_data,satisfaction ~ .,
                 family = "binomial")
 # summary of full model
-s<- summary(glm_full)
-s
+summary(glm_full)
 ```
+As we can see from model statistics, the p value of "flight distance" feature is not lower than 0.5 which indicates that the effect of "flight distance" on prediction of satisfaction is insignificant. However, we would like to keep all features in the model for now. Then we will full model with feature selection models.
+
+In the code snippet below, we can observe the calculation goodness of fit, also known as R-squared (R²). R² serves as a metric to assess how well the GLM (Generalized Linear Model) model aligns with the given data in comparison to a null model, which solely consists of an intercept without any predictors. The R² value is derived using a simple formula: 1 minus the ratio of the deviance of the fitted model to the deviance of the null model. 
+
+R² value provides insights into the amount of variation in the data that can be accounted for by the model, thus serving as a measure of its effectiveness.
 
 ```{r}
-#  Here, the code calculates the coefficient of determination, often referred to as R-squared (R²). R² is a measure of how well the GLM model fits the data compared to a null model (a model with no predictors, only an intercept). The formula used to calculate R² is 1 minus the ratio of the deviance of the fitted model (s$deviance) to the deviance of the null model (s$null.deviance). The deviance measures the lack of fit of the model, so a smaller deviance indicates a better fit. Therefore, subtracting the ratio from 1 gives the proportion of deviance explained by the model, which is commonly known as R².
-r2<- 1 - (s$deviance/s$null.deviance)
+r2<- 1 - (summary(glm_full)$deviance/summary(glm_full)$null.deviance)
+r2
+```
 
-# In this line, the code calculates the variance inflation factor (VIF) by taking the reciprocal of 1 minus the R² value. The VIF is a measure of multicollinearity, which assesses the extent to which predictor variables are correlated with each other. If there is a high degree of multicollinearity, it can affect the reliability and interpretability of the GLM model. The formula used here, 1/(1-r2), is a common way to calculate the VIF, where a value greater than 1 indicates the presence of multicollinearity.
+
+In the provided line of code, the calculation of the variance inflation factor (VIF) is performed by taking the reciprocal of 1 minus the R² value. The VIF serves as a metric to evaluate the presence of multicollinearity, which refers to the correlation between predictor variables within a model. High levels of multicollinearity can introduce issues regarding the reliability and interpretability of the GLM (Generalized Linear Model).
+
+```{r}
 1/(1-r2)
 ```
 
-#COLLINEARITY #It refers to the situation in which 2 or more predictor
-variables are closely #related to one another. The presence of
-collinearity can destabilize the model #and make it harder to estimate
-the effect of each predictor variable.
 
-#LOW collinearity is desirable.
 
-#VIF (Variance Inflation Factor) is a measure of collinearity among
-predictor variables #within a multiple regression. It is calculated by
-taking the the ratio of the variance #of all a given model's betas
-divide by the variance of a single beta if it were fit alone.
+### Logistic Regression with Backward Variable Selection
 
-#VIF = 1: no collinearity #1 \< VIF \< 5: moderate collinearity #VIF \>
-5: high collinearity (this is the case we want to avoid)
+Collinearity refers to a situation where two or more predictor variables in a statistical model are closely related to each other. The presence of collinearity can introduce instability to the model and make it more challenging to accurately estimate the effect of each predictor variable.
 
-#Depending on what value of VIF you deem to be too high to include in
-the model, #you may choose to remove certain predictor variables and see
-if the corresponding #R-squared value or standard error of the model is
-affected.
+Ideally, we aim for low collinearity among predictor variables. When collinearity is low, it implies that the predictor variables are independent or weakly correlated, allowing for more reliable estimation of their individual effects on the model.
+
+The Variance Inflation Factor (VIF) is a measure used to assess collinearity among predictor variables within a multiple regression model. It is computed by taking the ratio of the variance of all the weights in the model divided by the variance of a single weight if that particular predictor variable were fitted alone.
+
+A VIF of 1 indicates no collinearity, while a VIF between 1 and 5 suggests moderate collinearity. On the other hand, a VIF greater than 5 indicates high collinearity, which is undesirable and should be avoided.
+
+To address high collinearity, we may choose to remove certain predictor variables from the model and observe the impact on the corresponding R-squared value. By iteratively adjusting the predictor variables, we can determine a suitable set of variables that minimize collinearity and yield a more robust model.
+
+Variable selection is crucial in regression models to ensure interpretability, computational efficiency, and generalization. It involves removing irrelevant variables, reducing redundancy, and combating overfitting. By choosing relevant variables, the model becomes easier to interpret, algorithms work faster with high-dimensional data, and overfitting is reduced. The focus is on low test error rather than training error. Variable selection is especially important for high-dimensional datasets with more features than observations. Here, we are gonna use backward selection starting from full model and reducing number of variables in order of high VIF factor to lower VIF factors to decrease multi-collinearity and increase robustness of model.
 
 ```{r}
 
-# VIF Iteration 0 
-# Using the VIF function and comparing the obtained values with the
-# computed quantity:
-# (The process is done iteratively where we delete one variable at time)
+# VIF Iteration 0
+# The process is done iteratively where we delete one variable at time
 vif_values <- VIF(glm_full)
-
-
 
 # Create a data frame with variable names and their corresponding VIF values
 vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
 
 # Sort the data frame in decreasing order of VIF values
 sorted_df <- vif_df[order(-vif_df$VIF), ]
+rownames(sorted_df) <- NULL
 
 # Print the sorted data frame
 print(sorted_df)
 ```
-
 ```{r}
 # VIF Iteration 1
-# Using the VIF function and comparing the obtained values with the
-# computed quantity:
-# (The process is done iteratively where we delete one variable at time)
+# The process is done iteratively where we delete one variable at time
 # Model definition:
-glm_vif1<- glm(data = train,
+glm_vif1<- glm(data = train_data,
                 satisfaction ~ .-Arrival_Delay_in_Minutes,
                 family = "binomial")
 vif_values <- VIF(glm_vif1)
@@ -153,6 +153,7 @@ vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = 
 
 # Sort the data frame in decreasing order of VIF values
 sorted_df <- vif_df[order(-vif_df$VIF), ]
+rownames(sorted_df) <- NULL
 
 # Print the sorted data frame
 print(sorted_df)
@@ -160,11 +161,9 @@ print(sorted_df)
 
 ```{r}
 # VIF Iteration 2
-# Using the VIF function and comparing the obtained values with the
-# computed quantity:
-# (The process is done iteratively where we delete one variable at time)
+# The process is done iteratively where we delete one variable at time
 # Model definition:
-glm_vif2<- glm(data = train,
+glm_vif2<- glm(data = train_data,
                 satisfaction ~ .
                -Arrival_Delay_in_Minutes
                -Inflight_entertainment,
@@ -176,6 +175,7 @@ vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = 
 
 # Sort the data frame in decreasing order of VIF values
 sorted_df <- vif_df[order(-vif_df$VIF), ]
+rownames(sorted_df) <- NULL
 
 # Print the sorted data frame
 print(sorted_df)
@@ -183,11 +183,9 @@ print(sorted_df)
 
 ```{r}
 # VIF Iteration 3
-# Using the VIF function and comparing the obtained values with the
-# computed quantity:
-# (The process is done iteratively where we delete one variable at time)
+# The process is done iteratively where we delete one variable at time
 # Model definition:
-glm_vif3<- glm(data = train,
+glm_vif3<- glm(data = train_data,
                 satisfaction ~ .
                 -Arrival_Delay_in_Minutes
                 -Inflight_entertainment
@@ -200,6 +198,7 @@ vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = 
 
 # Sort the data frame in decreasing order of VIF values
 sorted_df <- vif_df[order(-vif_df$VIF), ]
+rownames(sorted_df) <- NULL
 
 # Print the sorted data frame
 print(sorted_df)
@@ -207,11 +206,9 @@ print(sorted_df)
 
 ```{r}
 # VIF Iteration 4
-# Using the VIF function and comparing the obtained values with the
-# computed quantity:
-# (The process is done iteratively where we delete one variable at time)
+# The process is done iteratively where we delete one variable at time
 # Model definition:
-glm_vif4<- glm(data = train,
+glm_vif4<- glm(data = train_data,
                 satisfaction ~ .
                -Arrival_Delay_in_Minutes
                -Inflight_entertainment
@@ -225,13 +222,16 @@ vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = 
 
 # Sort the data frame in decreasing order of VIF values
 sorted_df <- vif_df[order(-vif_df$VIF), ]
+rownames(sorted_df) <- NULL
 
 # Print the sorted data frame
 print(sorted_df)
 ```
 
+We deleted all the features with VIF greater than 2 to decrease multicollinearity. Let's check the current model statistics.
+
 ```{r}
-glm_reduced<- glm(data = train,
+glm_reduced<- glm(data = train_data,
                 satisfaction ~ .
                 -Arrival_Delay_in_Minutes
                 -Inflight_entertainment
@@ -241,29 +241,115 @@ glm_reduced<- glm(data = train,
 # Observation of the model summary:
 summary(glm_reduced)
 ```
+"Flight_Distance" and "Gate_location" features are insignificant in prediction of satisfaction. Let's drop them from model.
 
 ```{r}
-# While checking the p value in summary, as we see Flight_Distance and Gate_location does not have significant impact on satisfaction.
+# Drop Flight_Distance and Gate_location from model.
 
-glm_last<- glm(data = train,
+glm_backward<- glm(data = train_data,
                 satisfaction ~ .
                 -Arrival_Delay_in_Minutes
                 -Inflight_entertainment
                 -Ease_of_Online_booking 
-                -Cleanliness-Gate_location
+                -Cleanliness
                 -Flight_Distance
                 -Gate_location,
                 family = "binomial")
-
-
-# Computing the predictions with the model on the test set:
-pred_glm_last<- predict(glm_last, test, type = "response")
 ```
 
-# Classification Outputs : Accuracy, F1, Precision, Recall
+Interestingly, model with backward elimination variable selection has less R² value than full model. We will discuss the reason at the end of Logistic Regression part. 
 
 ```{r}
-#The function will return the calculated evaluation metrics in the results data frame
+r2<- 1 - (summary(glm_backward)$deviance/summary(glm_backward)$null.deviance)
+r2
+```
+
+
+### Logistic Regression with Shrinkage Method
+
+Shrinkage methods, such as Ridge and Lasso regression, are techniques used in linear modeling to control model complexity and reduce overfitting. Instead of selecting a subset of predictors or setting some coefficients to zero, these methods constrain or regularize the coefficient estimates, effectively shrinking them towards zero. Ridge regression achieves this by using quadratic shrinking, while Lasso regression uses absolute-value shrinking. Other hybrid approaches, like the elastic net, combine elements of both methods.
+
+One disadvantage of ridge regression is that it includes all predictors in the final model, unlike subset selection methods which typically select a subset of variables. To overcome this drawback, the lasso regression is used as an alternative. The lasso also shrinks the coefficient estimates towards zero, and it tends to perform better.
+
+Lambda is the Tuning Parameter that controls the bias-variance tradeoff and we estimate its best value via cross-validation.
+
+```{r}
+# We look for the best value for lambda
+# We use cross validation glmnet
+glm_lasso <- cv.glmnet(X_train, as.factor(y_train),
+                      alpha = 0, family = "binomial", type.measure = "class")
+plot(glm_lasso)
+
+```
+
+
+```{r}
+# We identify th best lambda value
+best_lambda <- glm_lasso$lambda.min
+best_lambda
+```
+
+### ROC Curve
+
+We created our 3 different logistic regression model. Now, it is time to compare them on test sets to see their robustness on generalization and power on predicting satisfaction of customer.
+
+```{r}
+
+# Full model
+# Computing the predictions with the model on the test set:
+pred_glm_full<- predict(glm_full, data.frame(X_test), type = "response")
+
+# Backward elimination selection
+# Computing the predictions with the model on the test set:
+pred_glm_backward<- predict(glm_backward, data.frame(X_test), type = "response")
+
+# Lasso regresssion
+# Computing the predictions with the model on the test set:
+pred_glm_lasso<- predict(glm_lasso, X_test, type= "response", s = best_lambda)
+
+```
+
+The Receiver Operating Characteristics (ROC) curve illustrates the relationship between the True positive rate and the False positive rate across various thresholds. In an ideal scenario, the ROC curve would closely follow the top left corner. The overall effectiveness of a classifier, considering all thresholds, is quantified by the Area Under the Curve (AUC). A larger AUC value indicates a superior classifier performance.
+
+```{r roc, echo=FALSE, message=FALSE, warnings=FALSE}
+par(pty="s")
+roc(y_test,pred_glm_full,plot=TRUE, legacy.axes=TRUE, percent=TRUE, 
+    xlab="False Positive Percentage", ylab="True Positive Percentage",
+    col="blue", lwd=4,
+    print.auc=TRUE, print.auc.y=60, print.auc.x=30,
+    quiet = TRUE)
+
+plot.roc(y_test,pred_glm_backward,add=TRUE, legacy.axes=TRUE, percent=TRUE, 
+    xlab="False Positive Percentage", ylab="True Positive Percentage",
+    col="red", lwd=4,
+    print.auc=TRUE, print.auc.y=50, print.auc.x=30,
+    quiet = TRUE)
+
+plot.roc(y_test,pred_glm_lasso,add=TRUE, legacy.axes=TRUE, percent=TRUE, 
+    xlab="False Positive Percentage", ylab="True Positive Percentage",
+    col="green", lwd=4,
+    print.auc=TRUE, print.auc.y=40, print.auc.x=30,
+    quiet = TRUE)
+
+legend("bottomright",
+       legend=c("glm_full","glm_backward","glm_lasso"),
+       col=c("blue","red","green"),
+       lwd=4)
+```
+
+Ideally, we expect backward and lasso model to have better generaliation; however, in this scenario, the results yield opposite situation.
+
+### Comparison of Logistic Classifiers
+
+We have 3 different Logistic Regression models
+1- Basic Logistic Classifier : glm_full
+2- Logistic Regression with Backward Variable Selection: glm_backward
+3- Logistic Regression with Lasso Shrinkage: glm_lasso
+
+Now, it is time to make predictions and compare metric results.
+But, first we should decide best thresholds for models.
+```{r}
+# This function will return evaluation metrics
 calculate_evaluation_metrics <- function(thresholds, output_list, y_test) {
   # Create an empty data frame to store the results
   results_df <- data.frame(
@@ -274,7 +360,8 @@ calculate_evaluation_metrics <- function(thresholds, output_list, y_test) {
     Recall = numeric(length(thresholds))
   )
   
-  # Calculate evaluation metrics for each threshold and store the results in the data frame
+  # Calculate evaluation metrics for each threshold 
+  # Store the results in the data frame
   for (i in 1:length(thresholds)) {
     threshold <- thresholds[i]
     
@@ -299,298 +386,279 @@ calculate_evaluation_metrics <- function(thresholds, output_list, y_test) {
 ```
 
 ```{r}
-
-# Converting the prediction in {0,1} according to the chosen threshold:
-thresholds <- c(0.4, 0.5, 0.6, 0.7)
-output_list <- list()
-
-for (threshold in thresholds) {
-  output <- ifelse(pred_glm_last > threshold, 1, 0)
-  output_list[[as.character(threshold)]] <- output
-}
-
-# Access the outputs using the threshold values as keys
-#output_list$`0.4`
-#output_list$`0.5`
-#output_list$`0.6`
-#output_list$`0.7`
-```
-
-```{r}
-# Calculate evaluation metrics
-results <- calculate_evaluation_metrics(thresholds, output_list, y_test)
-print(results)
-
-# Print the results as a table in R Markdown
-knitr::kable(results, align = "c")
-
-```
-
-```{r}
-
-#Model definition:
-# Here we don't re-apply the VIF method because we start from the
-# previous result.
-glm_full<- glm(data = train,
-                satisfaction ~ .,
-                family = "binomial")
-
-# Application of the Stepwise method, specifying that we consider
-# both the forward and the backward directions. We consider as
-# reference metric the Akaike Information Criterion:
-glm_step <- stepAIC(glm_full, direction = "both",trace = FALSE)
-# Observation of the model summary:
-summary(glm_step)
-
-# Computing the predictions with the model on the test set:
-pred_glm_step<- predict(glm_step, test, type = "response")
-```
-
-```{r}
-
-# Converting the prediction in {0,1} according to the chosen threshold:
-thresholds <- c(0.4, 0.5, 0.6, 0.7)
-output_list <- list()
-
-for (threshold in thresholds) {
-  output <- ifelse(pred_glm_step > threshold, 1, 0)
-  output_list[[as.character(threshold)]] <- output
-}
-
-# Access the outputs using the threshold values as keys
-#output_list$`0.4`
-#output_list$`0.5`
-#output_list$`0.6`
-#output_list$`0.7`
-```
-
-```{r}
-# Calculate evaluation metrics
-results <- calculate_evaluation_metrics(thresholds, output_list, y_test)
-print(results)
-
-# Print the results as a table in R Markdown
-knitr::kable(results, align = "c")
-
-```
-
-# ROC CURVE
-
-```{r}
-
-
-plot_roc_curve <- function(predicted_probabilities, true_labels) {
-  # Calculate TPR and FPR for different threshold values
-  thresholds <- seq(0, 1, by = 0.01)
-  tpr <- numeric(length = length(thresholds))
-  fpr <- numeric(length = length(thresholds))
+evaluate_on_thresholds <- function(predictions,y_test, thresholds) {
+  # Converting the prediction in {0,1} according to the chosen threshold:
+  output_list <- list()
   
-  for (i in 1:length(thresholds)) {
-    threshold <- thresholds[i]
-    predicted_labels <- ifelse(predicted_probabilities >= threshold, 1, 0)
-    
-    tp <- sum(predicted_labels == 1 & true_labels == 1)
-    tn <- sum(predicted_labels == 0 & true_labels == 0)
-    fp <- sum(predicted_labels == 1 & true_labels == 0)
-    fn <- sum(predicted_labels == 0 & true_labels == 1)
-    
-    tpr[i] <- tp / (tp + fn)
-    fpr[i] <- fp / (fp + tn)
+  for (threshold in thresholds) {
+    output <- ifelse(predictions > threshold, 1, 0)
+    output_list[[as.character(threshold)]] <- output
   }
   
-  # Plot ROC curve
-  plot(fpr, tpr, type = "l", main = "ROC Curve", xlab = "False Positive Rate (FPR)", ylab = "True Positive Rate (TPR)")
-  abline(0, 1, col = "gray")
+  # Access the outputs using the threshold values as keys
+  #output_list$`0.4`
+  #output_list$`0.5`
+  #output_list$`0.6`
+  #output_list$`0.7`
   
-  # Find the best threshold point
-  best_threshold <- thresholds[which.max(tpr - fpr)]
-  best_tpr <- tpr[which.max(tpr - fpr)]
-  best_fpr <- fpr[which.max(tpr - fpr)]
   
-  # Add the best threshold point to the graph
-  points(best_fpr, best_tpr, col = "red", pch = 16)
-  text(best_fpr, best_tpr, sprintf("Best Threshold (%.2f)", best_threshold), pos = 4)
+  # Calculate evaluation metrics
+  results <- calculate_evaluation_metrics(thresholds, output_list, y_test)
   
-  # Return the best threshold and its TPR value
-  return(list(best_threshold = best_threshold, best_tpr = best_tpr))
+  # Print the results as a table in R Markdown
+  knitr::kable(results, align = "c")
 }
+```
 
 
+
+
+```{r}
+thresholds <- c(0.4, 0.5, 0.6, 0.7)
+evaluate_on_thresholds(pred_glm_full, y_test, thresholds)
 ```
 
 ```{r}
-
-result<-plot_roc_curve(pred_glm_step, y_test)
-print(result$best_threshold)
-print(result$best_tpr)
+thresholds <- c(0.4, 0.5, 0.6, 0.7)
+evaluate_on_thresholds(pred_glm_backward, y_test, thresholds)
 ```
+
+```{r}
+thresholds <- c(0.4, 0.5, 0.6, 0.7)
+evaluate_on_thresholds(pred_glm_lasso, y_test, thresholds)
+```
+All 3 logistic regression models have highest F1 score with 0.6 threshold. Eventhough the expectation that backward variable selection and lasso regression model would suprass full_model, the results shows opposite. F1 score with 0.6 threshold for glm_full is higher than other models on the test set. We can conclude that generalizability of full model is higher. We may conclude that we have many samples but we do not have enough features to increase model generalizability, so decreasing number of variables or shrinking their weights do not make positive effect. We take pred_glm_full as a winner prediction from logistic regression part to further compare it with other models.
 
 ## Naive Bayes
 
+The Naive Bayes Classifier is a probabilistic algorithm used for binary classification. It assumes that features are independent of each other and calculates prior probabilities and likelihoods during the training phase. The prior probabilities represent the occurrence of each class, while the likelihoods determine the probability of a feature given a class. By applying Bayes' theorem, the algorithm calculates posterior probabilities for each class and assigns the instance to the class with the highest probability.
+
 ```{r}
-
-#1. Estimating the p-dimensional joint distribution of predictors may be
-#challenging;
-#2. the conditional independence assumption allows us to estimate only
-#the marginal distribution of predictors;
-#3. in most cases the conditional independence assumption is unrealistic
-#and mainly made for convenience...
-#4. ... however despite the strong assumption Naive Bayes often
-#produces good classification results, especially in settings where n is
-#not large enough relative to p to effectively estimate the joint
-#distribution of predictors within each class.
-
-
-#The Naive Bayes Classifier is a probabilistic algorithm used for binary classification. It assumes that features are independent of each other and calculates prior probabilities and likelihoods during the training phase. The prior probabilities represent the occurrence of each class, while the likelihoods determine the probability of a feature given a class. By applying Bayes' theorem, the algorithm calculates posterior probabilities for each class and assigns the instance to the class with the highest probability. 
-
-nb.fit <- naiveBayes(data = X_train,
+nb.fit <- naiveBayes(data = data.frame(X_train),
                      y_train ~ .)
 
 # Make predictions on the test data
-predictions <- predict(nb.fit, newdata = X_test)
+pred_naive_bayes <- predict(nb.fit, newdata = X_test)
 
-# Evaluate the performance of the classifier
-table(predictions, y_test)
-mean(predictions == y_test)
+# Evaluate accuracy of classifier
+mean(pred_naive_bayes == y_test)
 ```
 
-## Decision Trees
+BIC (Bayesian Information Criterion) is a commonly used model selection criteria that help in selecting the best model among a set of competing models. It takes into account the goodness of fit of the model and penalize the complexity of the model to avoid overfitting.
+
+BIC (Bayesian Information Criterion):
+It balances the trade-off between model fit and model complexity. 
+Formula: BIC = -2 * log-likelihood + p * log(n)
+
+* log-likelihood: The log-likelihood of the model, which measures how well the model fits the data.
+* p: The number of parameters in the model.
+* n: The sample size.
+
+BIC penalizes model complexity more heavily than the Akaike Information Criterion (AIC). The lower the BIC value, the better the model is considered to be. Therefore, when comparing models, the model with the lowest BIC is preferred.
 
 ```{r}
-# Build the decision tree model
 
-#choose some variables
-# Specify the names of variables to drop
-#variables_to_drop <- c("Arrival_Delay_in_Minutes", "Inflight_entertainment", "Ease_of_Online_booking","Gate_location","Flight_Distance","Gate_location")
+# Best Subset Selection
 
-# Drop the variables from the training dataset
-#tree_data <- X_train[, !(names(X_train) %in% variables_to_drop)]
+# The regsubsets() function (part of the leaps library) 
+# performs best subset selection by identifying the best 
+# model that contains a given number of predictors, 
+# where best is quantified using bic
 
+n <- dim(X_train)[1]
+regfit.full <- regsubsets(y_train~.,data=data.frame(X_train),nvmax=n)
+reg.summary <- summary(regfit.full)
 
-tree_model <- rpart(data = X_train,
-                     y_train ~ .,
-                    method = "class")
+# Plotting BIC 
+# BIC with its smallest value
+plot(reg.summary$bic,xlab="Number of Variables",ylab="BIC",type='l')
+min <- which.min(reg.summary$bic)
+points(10,reg.summary$bic[10],col="red",cex=2,pch=20)
+```
+Since BIC (Bayesian Information Criterion) does not change dramatically after 10th variable. We can use only 10 variables to decide satisfaction.
 
-# Display the tree plot
-#plot(tree_model)
-#text(tree_model)
+```{r}
+# choose 10 variable model
+best_model <- coef(regfit.full, id = 10) 
+abs_coefficients <- abs(best_model)
+sorted_variables <- names(sort(abs_coefficients, decreasing = TRUE))
+column_names <- sorted_variables[-1]
+new_X_train <- X_train[, column_names, drop = FALSE]
+new_X_test <- X_test[, column_names, drop = FALSE]
+
+nb.fit <- naiveBayes(data = data.frame(new_X_train),
+                     y_train ~ .)
 
 # Make predictions on the test data
-predictions <- predict(tree_model, newdata = X_test, type = "class")
+pred_naive_bayes <- predict(nb.fit, newdata = new_X_test)
 
-# Evaluate the performance of the classifier
-table(predictions, y_test)
-mean(predictions == y_test)
+# Evaluate accuracy
+mean(pred_naive_bayes == y_test)
 ```
 
-## Random Forest
+The accuracy of model with 10 variables is higher. We can continue with this model.
+
+## K-Nearest Neigbors (KNN)
+
+K-Nearest Neighbors (KNN) is a supervised machine learning algorithm used for classification and regression tasks. It is a non-parametric algorithm, which means it doesn't make any assumptions about the underlying distribution of the data. KNN is a simple yet powerful algorithm that is widely used for its intuitive concept and easy implementation.
+
+The main idea behind KNN is to classify a new data point based on the majority vote of its neighbors. The algorithm assumes that similar data points tend to belong to the same class or have similar numerical values. The "K" in KNN refers to the number of nearest neighbors that are considered for classification or regression.
+
+In this model, we used K-fold cross validation. Cross-validation is a valuable technique in statistics and machine learning that helps assess the performance of a model and select optimal hyperparameters. Specifically, the K-fold cross-validation method is commonly employed for this purpose.
+
+During K-fold cross-validation, the training set is divided into K equally sized subsets or "folds." The model is then trained K times, each time using K-1 of the folds as the training data and leaving one fold as the validation set. This process is repeated K times, ensuring that each fold serves as the validation set exactly once.
+
+We can mention two benefits of k-fold cross validation. First, it allows us to leverage the entire training dataset for both training and validation. By iteratively rotating the folds, every data point gets an opportunity to be in the validation set, providing a more comprehensive evaluation of the model's performance.
+
+Secondly, K-fold cross-validation helps to mitigate the potential bias introduced by using a single validation set. When we reserve a separate validation set, there is a risk that the performance estimation becomes overly influenced by the specific data points in that set. By repeatedly shuffling and partitioning the data into different folds, we obtain a more robust estimate of the model's performance, as it is evaluated on multiple distinct subsets of the data.
+
+The final evaluation of the model is typically based on the average performance across all K iterations. This averaging process helps to reduce the variance in the performance estimate and provides a more stable measure of the model's effectiveness.
+
+We need to scale our data for two reasons. Firstly, scaling increases the speed of training process. Secondly, if we do not scale the data, the features with higher value will have more impact on predictions, however, the features should have same weight and the change only should be in range of 0-1. 
 
 ```{r}
-# Build random forest model
 
-# Build the Random Forest model
-# number of trees : 100
-rf_model <- randomForest(data = X_train,
-                        factor(y_train) ~ ., 
-                        ntree = 100)
-
-# Make predictions on the test data
-predictions <- predict(rf_model, newdata = X_test,)
-
-# Evaluate the performance of the classifier
-table(predictions, y_test)
-mean(predictions == y_test)
+# Function for feature scaling
+min_max_norm <- function(x) {
+(x - min(x)) / (max(x) - min(x))
+}
+# We normalize the columns
+train_scaled <- as.data.frame(lapply(train_data, min_max_norm))
+test_scaled<- as.data.frame(lapply(test_data, min_max_norm))
 ```
 
-# Training error vs Test error
 
-We are interested in assessing the accuracy of predictions when the
-statistical learning method is applied to previously unseen test
-observations not used to train the method. Recall the distinction
-between the test error and the training error: - The test error is the
-expected error that results from using a statistical learning method to
-predict the response on a new observation, one that was not used in
-training the method. It can be estimated if a designated test set is
-available. -In contrast, the training error can be easily computed by
-applying the statistical learning method to the observations used in its
-training. -But the training error rate often is quite different from the
-test error rate, and in particular the former can dramatically
-underestimate the latter.
+```{r knn}
+# KNN with K-fold cross validation
 
+# Define a range of K values
+k_values <- 1:10
+
+# Perform cross-validation and calculate error rates
+error_rates <- sapply(k_values, function(k) {
+  set.seed(123)  # For reproducibility
+  model <- train(as.factor(satisfaction)~., data = train_scaled, 
+                 method = "knn", 
+                 trControl = trainControl(method = "cv", number = 5),
+                 tuneGrid = data.frame(k = k))
+  1 - model$results$Accuracy
+})
+
+# Plot the Error Rates
+plot(k_values, error_rates, type = "b", pch = 16, xlab = "K Value", ylab = "Error Rate",
+     main = "KNN: Error Rate vs. K Value")
+
+
+```
 ```{r}
-# Then we try to reproduce the same plot as above, considering the
-# classifications obtained with the models
-a <- ggplot(X_test,
-            aes(
-              x = Flight_Distance ,
-              y = Departure_Delay_in_Minutes ,
-              color = factor(output_list$`0.6`) # 0 or 1
-            )) +
-  geom_point(size = 2) +
-  labs(
-    x = "Flight Distance",
-    y = "Departure Delay (minutes)",
-    color = "Satisfaction",
-    title = "Simple GLM : 0.6"
-  ) +
-  scale_color_manual(values = c("0" = "red", "1" = "darkgreen")) +
-  theme(legend.position = c(0.8, 0.8))
-
-b <- ggplot(X_test,
-            aes(
-              x = Flight_Distance ,
-              y = Departure_Delay_in_Minutes ,
-              color = factor(output_list$`0.5`) # 0 or 1
-            )) +
-  geom_point(size = 2) +
-  labs(
-    x = "Flight Distance",
-    y = "Departure Delay (minutes)",
-    color = "Satisfaction",
-    title = "Simple GLM  : 0.5"
-  ) +
-  scale_color_manual(values = c("0" = "red", "1" = "darkgreen")) +
-theme(legend.position = c(0.8, 0.8))
-
-grid.arrange(a, b,ncol = 2)
+# find the k giving minimum error rate
+k_min <- which.min(error_rates)
+k_min
 ```
 
 ```{r}
-# We compare the results obtained with the two different models, plotting
-# now an estimation of the logistic curve using the predictions given by
-# the models:
-predicted_data <-
-  data.frame(prob.of.Satisfaction = pred_glm_step, Satisfaction = y_test)
-predicted_data <-
-  predicted_data[order(predicted_data$prob.of.Satisfaction, decreasing = FALSE), ]
-predicted_data$rank <- 1:nrow(predicted_data)
-a <- ggplot(data = predicted_data, aes(x = rank, y = prob.of.Satisfaction)) +
-  geom_point(
-    aes(color = as.factor(Satisfaction)),
-    alpha = 1,
-    shape = 1,
-    stroke = 1
-  ) +
-  xlab("Index") +
-  ylab("Predicted probability") +
-  ggtitle("Estimated Logistic Curve - Simple GLM")
-
-
-predicted_data <-
-  data.frame(prob.of.Satisfaction = pred_glm_last, Satisfaction = y_test)
-predicted_data <-
-  predicted_data[order(predicted_data$prob.of.Satisfaction, decreasing = FALSE), ]
-predicted_data$rank <- 1:nrow(predicted_data)
-b <- ggplot(data = predicted_data, aes(x = rank, y = prob.of.Satisfaction)) +
-  geom_point(
-    aes(color = as.factor(Satisfaction)),
-    alpha = 1,
-    shape = 1,
-    stroke = 1
-  ) +
-  xlab("Index") +
-  ylab("Predicted probability") +
-  ggtitle("Estimated Logistic Curve - GLM with Stepwise")
-
-grid.arrange(a, b, nrow = 2)
+# make predictions with k = k_min 
+pred_knn<- knn(train_scaled[,-23], test_scaled[,-23],
+                cl = train_scaled$satisfaction, 
+                k = k_min)
 ```
+
+
+# Classification Results
+
+## Confusion Matrix and Metrics
+```{r}
+# Create a function for confusion matrix and other metrics
+draw_confusion_matrix <- function(cm) {
+
+  layout(matrix(c(1,1,2)))
+  par(mar=c(2,2,2,2))
+  plot(c(100, 345), c(300, 450), type = "n", xlab="", ylab="", xaxt='n', yaxt='n')
+  title('CONFUSION MATRIX', cex.main=2)
+
+  # create the matrix 
+  rect(150, 430, 240, 370, col='#3F97D0')
+  text(195, 435, 'Unsatisfied', cex=1.2)
+  rect(250, 430, 340, 370, col='#F7AD50')
+  text(295, 435, 'Satisfied', cex=1.2)
+  text(125, 370, 'Predicted', cex=1.3, srt=90, font=2)
+  text(245, 450, 'Actual', cex=1.3, font=2)
+  rect(150, 305, 240, 365, col='#F7AD50')
+  rect(250, 305, 340, 365, col='#3F97D0')
+  text(140, 400, 'Unsatisfied', cex=1.2, srt=90)
+  text(140, 335, 'Satisfied', cex=1.2, srt=90)
+
+  # add in the cm results 
+  res <- as.numeric(cm$table)
+  text(195, 400, res[1], cex=1.6, font=2, col='white')
+  text(195, 335, res[2], cex=1.6, font=2, col='white')
+  text(295, 400, res[3], cex=1.6, font=2, col='white')
+  text(295, 335, res[4], cex=1.6, font=2, col='white')
+
+  # add in the specifics 
+  plot(c(100, 0), c(50, 0), type = "n", xlab="", ylab="", main = "DETAILS", xaxt='n', yaxt='n')
+  text(30, 40, names(cm$byClass[5]), cex=1.2, font=2)
+  text(30, 30, round(as.numeric(cm$byClass[5]), 3), cex=1.2)
+  text(50, 40, names(cm$byClass[7]), cex=1.2, font=2)
+  text(50, 30, round(as.numeric(cm$byClass[7]), 3), cex=1.2)
+  text(70, 40, names(cm$byClass[6]), cex=1.2, font=2)
+  text(70, 30, round(as.numeric(cm$byClass[6]), 3), cex=1.2)
+
+
+}  
+```
+
+
+```{r}
+# Confusion matrix for glm_full_model
+
+# Use best threshold for prediction (0 or 1)
+Threshold <- 0.6
+pred_glm_full_factor <- as.factor(ifelse(pred_glm_full >= Threshold , 1,0))
+
+
+conf_matrix_glm <- confusionMatrix(data = pred_glm_full_factor, 
+                                     reference = as.factor(y_test))
+draw_confusion_matrix(conf_matrix_glm)
+```
+
+```{r}
+# Confusion matrix for Naive Bayes
+conf_matrix_naive <- confusionMatrix(data = pred_naive_bayes, 
+                                     reference = as.factor(y_test))
+draw_confusion_matrix(conf_matrix_naive)
+```
+
+```{r}
+# Confusion matrix for KNN
+conf_matrix_knn <- confusionMatrix(data = pred_knn, reference = as.factor(y_test))
+draw_confusion_matrix(conf_matrix_knn)
+```
+
+In our project, we want to find unsatisfied customers as precise as possible. Because, our hypothesis is to increase total customer satisfaction with low budget. Therefore, finding unsatisfied customers and having less satisfied customer in our target will be the best method. Considering that, precision metric will be most valuable metric. Then we can count on F1 score, since it considers both Precision and Recall into account.
+
+KNN has the highest precision score rather than Naive Bayes and Logistic Regression with full features model. However, KNN is an non-parametric model and it does not have any bias related to hypothesis space. Therefore, the complexity of model increases with number of samples. Besides, we used cross-validation which also increases model complexity. We can use a validation set approach to decrease training time. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
