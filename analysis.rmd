@@ -35,23 +35,48 @@ data = rbind(data_train, data_test)
 attach(data)
 ```
 
-# Variable description
+# Introduction
+In this project, we will predict whether a passenger will be satisfied or dissatisfied with the services offered by an airline company. The dataset comprises a survey on airline passenger satisfaction.
 
-This section provides a summary of each variable in the dataset, grouped
-by the target variable (satisfaction).
+The main objectives of this project are to identify the factors that have a strong correlation with passenger satisfaction or dissatisfaction and to develop a predictive model for passenger satisfaction.
 
-```{r}
-# Print summary for each variable grouped by satisfaction, including the name of the variable
-for (col in names(data)) {
-  print(col)
-  print(by(data[[col]], data$satisfaction, summary))
-}
-```
+The dataset: https://www.kaggle.com/datasets/teejmahal20/airline-passenger-satisfaction
 
 ```{r}
-# print names of the columns
-names(data)
+summary(data)
 ```
+
+From the summary we can see that a lot of features are ordinal because they represent ratings for different services offered during a flight. 
+We can observe that some NA values are present in "Arrival.Delay.in.Minutes" feature, it will be dealt later.
+Now we will look into all the nominal features to see their primal distribution.
+
+```{r}
+table(data$Gender)
+```
+"Gender" feature is quite perfectly balanced.
+
+```{r}
+table(data$Customer.Type)
+```
+We can see that in Customer.Type feature there are only two values, disloyal and loyal customer. 
+The values for this feature are not balanced, we will see later if this feature is useful for our model.
+
+```{r}
+table(data$Type.of.Travel)
+```
+Also in Type.of.Travel feature there are only two values, personal and business travel.
+The values for this feature are not balanced, business travel are double than personal travel.
+
+```{r}
+table(data$Class)
+```
+In Class feature there are three values, business, eco plus and eco.
+The values for this feature are not balanced, business and eco looks quite balanced while eco plus is way more less represented.
+
+```{r}
+table(data$satisfaction)
+```
+Our target feature is satisfaction, we can see that the values are not perfectly balanced. 
 
 # Data preprocessing
 
@@ -62,10 +87,8 @@ factors.
 ```{r}
 # replace dots with underscores in column names
 names(data) = gsub("\\.", "_", names(data))
-
 # drop X and id column
 data = data %>% select(-X, -id)
-
 names(data)
 ```
 
@@ -77,6 +100,27 @@ data$Type_of_Travel = factor(data$Type_of_Travel, levels = c("Personal Travel", 
 data$Class = factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))
 data$satisfaction = factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))
 ```
+
+Now we can visualize how the features are distributed by satisfaction.
+This section provides a summary of each variable in the dataset, grouped
+by our target variable.
+
+```{r}
+# Print summary for each variable grouped by satisfaction, including the name of the variable
+for (col in names(data)) {
+  print(col)
+  print(by(data[[col]], data$satisfaction, summary))
+}
+```
+From here we can see that:
++ men and women are equally satisfied and dissatisfied
++ dissatisfied customer are younger than satisfied customer (see 1st quartile and median)
++ personal travel is more likely to be dissatisfied than business travel
++ business travel are slightly more likely to be satisfied 
++ business class' customers are more likely to be satisfied than eco and eco plus
++ longer distance flights are more likely to be satisfied
++ departure and arrival delays are more likely to bring dissatisfaction
+
 
 # Handling na values
 
@@ -96,6 +140,7 @@ let's the proportion of na values
 # Arrival_Delay_in_Minutes has na values, proportion of na values
 prop.table(table(is.na(data$Arrival_Delay_in_Minutes)))
 ```
+We can see that the proportion of na values is very low (less than 3% of the entire dataset), we can drop the na values.
 
 ```{r}
 # na values are only 0.03% of the data -> drop na values
@@ -127,6 +172,7 @@ for (col in names(data)[sapply(data, is.numeric)]) {
 
 grid.arrange(grobs = plots, ncol = 2)
 ```
+We can see that there are outliers in Departure_Delay_in_Minutes, Arrival_Delay_in_Minutes and Flight_Distance.
 
 # Visualization
 
@@ -158,7 +204,7 @@ for (col in names(data)[sapply(data, is.numeric)]) {
   }
   plot = ggplot(data, aes(x = .data[[col]])) +
   geom_bar() +
-  labs(title = paste("", col), x = col, y = "Count", bins=5)
+  labs(title = paste("", col), x = col, y = "Count", bins = 6)
 
   plots[[col]] = plot
 }
@@ -194,10 +240,8 @@ for (col in names(data)[sapply(data, is.factor)]) {
     next
   }
   plot = ggplot(data, aes(x = satisfaction, fill = .data[[col]])) +
+  theme_minimal() +
   geom_bar(position = "dodge") +
-  scale_fill_manual(values = rainbow(length(unique(data[[col]]))), 
-                    labels = unique(data[[col]]),
-                    name = col) +
   labs(title = paste("Histogram of Satisfaction by", col), x = "Satisfaction", y = "Count")
 
   plots[[col]] = plot
@@ -205,6 +249,24 @@ for (col in names(data)[sapply(data, is.factor)]) {
 }
 
 grid.arrange(grobs = plots, ncol = 2)
+```
+
+```{r}
+# plots ratings features vs satisfaction
+plots = list()
+for (col in names(data)[sapply(data, is.numeric)]) {
+  if (!col %in% ratings_fts_names) {
+    next
+  }
+  plot = ggplot(data, aes(x = .data[[col]], fill = satisfaction)) +
+  theme_minimal() +
+  geom_bar(position = "dodge") +
+  labs(title = paste("Histogram of Satisfaction by", col), x = "Satisfaction", y = "Count")
+
+  plots[[col]] = plot  
+}
+
+grid.arrange(grobs = plots, ncol = 3)
 ```
 
 ```{r fig.height=10}
