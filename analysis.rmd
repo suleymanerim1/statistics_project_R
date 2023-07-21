@@ -26,7 +26,10 @@ library(gridExtra)
 library(correlation)
 library(reshape)
 library(reshape2)
+```
 
+
+```{r message=FALSE}
 data_train = read.csv("train.csv")
 data_test = read.csv("test.csv")
 
@@ -34,6 +37,7 @@ data_test = read.csv("test.csv")
 data = rbind(data_train, data_test)
 attach(data)
 ```
+
 
 # Introduction
 In this project, we will predict whether a passenger will be satisfied or dissatisfied with the services offered by an airline company. The dataset comprises a survey on airline passenger satisfaction.
@@ -156,7 +160,7 @@ against the target variable (satisfaction).
 ```{r}
 ratings_fts_names = c("Inflight_wifi_service", "Departure_Arrival_time_convenient", 
   "Ease_of_Online_booking", "Gate_location", "Food_and_drink", "Online_boarding", 
-  "Seat_comfort", "Inflight_entertainment", "On-board_service", "Leg_room_service", 
+  "Seat_comfort", "Inflight_entertainment", "On_board_service", "Leg_room_service", 
   "Baggage_handling", "Checkin_service", "Inflight_service", "Cleanliness", "On_board_service")
 # plot boxplot of each numeric variable excluding ratings features
 plots = list()
@@ -179,13 +183,14 @@ We can see that there are outliers in Departure_Delay_in_Minutes, Arrival_Delay_
 This section includes histograms to visualize the distribution of
 categorical variables in the dataset.
 
-```{r}
+```{r fig.height=10, fig.width=12}
 # plot distribution of categorical variables
 plots = list()
 for (col in names(data)[sapply(data, is.factor)]) {
   plot = ggplot(data, aes(x = .data[[col]], fill = .data[[col]])) +
   geom_bar() +
-  labs(title = paste("Histogram of", col), x = col, y = "Count")
+  labs(title = paste("Histogram of", col), x = col, y = "Count") +
+  guides(fill = FALSE)
 
   plots[[col]] = plot
 }
@@ -194,21 +199,48 @@ grid.arrange(grobs = plots, ncol = 2)
 ```
 
 Here we plot the distribution of ratings features.
-
-```{r fig.height=10}
+```{r fig.height=18, fig.width=12}
 # plot distribution of ratings features
 plots = list()
+my_palette <- c("#1f78b4", "#33a02c", "#e31a1c", "#ff7f00", "#6a3d9a", "#b15928")
+
 for (col in names(data)[sapply(data, is.numeric)]) {
   if (!col %in% ratings_fts_names) {
     next
   }
-  plot = ggplot(data, aes(x = .data[[col]])) +
-  geom_bar() +
-  labs(title = paste("", col), x = col, y = "Count", bins = 6)
+  plot <- ggplot(data, aes(x = .data[[col]], fill = factor(.data[[col]]))) +
+    geom_bar() +
+    geom_text(stat = 'count', aes(label = ..count..), vjust = -0.5) +  
+    labs(title = paste("Histogram of ", col), x = col, y = "Count") +
+    scale_fill_manual(values = my_palette) +
+    guides(fill = FALSE)
 
-  plots[[col]] = plot
+  plots[[col]] <- plot
 }
 grid.arrange(grobs = plots, ncol = 3)
+```
+
+
+
+```{r}
+plots <- list()
+for (col in names(data)[sapply(data, is.numeric)]) {
+  if (!col %in% ratings_fts_names) {
+    next
+  }
+  plot <- ggplot(data, aes(x = .data[[col]], fill = factor(.data[[col]]))) +
+    geom_bar() +
+    geom_text(stat = 'count', aes(label = ..count..), vjust = -0.5) +  # Add count labels below each bar
+    labs(title = paste("Histogram of ", col), x = col, y = "Count", bins = 6) +
+    scale_fill_manual(values = my_palette) +  # Adding the custom color palette
+    facet_grid(. ~ satisfaction)  # Separate the plots based on 'satisfaction'
+
+  plots[[col]] <- plot
+}
+
+# Adjust the heights of the plots using 'heights' argument in grid.arrange
+grid.arrange(grobs = plots, ncol = 3)
+
 ```
 
 This section includes histograms to visualize the distribution of
@@ -293,11 +325,23 @@ This section converts the categorical variables to numeric
 representation for further analysis.
 
 ```{r}
-data$Gender = as.numeric(data$Gender) - 1
-data$Customer_Type = as.numeric(data$Customer_Type) - 1
-data$Type_of_Travel = as.numeric(data$Type_of_Travel) - 1
-data$Class = as.numeric(data$Class) - 1
-data$satisfaction = as.numeric(data$satisfaction) - 1
+gender_map = c("Male" = 0, "Female" = 1)
+data$Gender = gender_map[as.numeric(data$Gender)]
+
+customer_type_map = c("Loyal Customer" = 0, "disloyal Customer" = 1)
+data$Customer_Type = customer_type_map[as.numeric(data$Customer_Type)]
+
+type_of_travel_map = c("Personal Travel" = 0, "Business travel" = 1)
+data$Type_of_Travel = type_of_travel_map[as.numeric(data$Type_of_Travel)]
+
+class_map = c("Business" = 0, "Eco" = 1, "Eco Plus" = 2)
+data$Class = class_map[as.numeric(data$Class)]
+```
+
+
+```{r}
+satisfaction_map = c("neutral or dissatisfied" = 0, "satisfied" = 1)
+data$satisfaction = satisfaction_map[as.numeric(data$satisfaction)]
 ```
 
 # Data balance
@@ -344,7 +388,7 @@ prop.table(table(test_true))
 This section calculates the correlation matrix for numeric variables and
 plots a heatmap to visualize the correlations between variables.
 
-```{r}
+```{r fig.height=12, fig.width=12}
 # correlation matrix only for numeric variables
 correlation_matrix = cor(data[, sapply(data, is.numeric)])
 
@@ -354,9 +398,11 @@ ggplot(data = reshape2::melt(correlation_matrix)) +
   scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
                        midpoint = 0, limit = c(-1,1), space = "Lab",
                        name="Correlation") +
-  theme(axis.text.x = element_text(angle = 90, vjust = 1, 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
                                     size = 10, hjust = 1)) +
   coord_fixed()
+
+par(mfrow = c(1, 1))
 ```
 
 ```{r}
@@ -393,6 +439,52 @@ par(mfrow = c(1, 1))
 #save on cvs
 # write.csv(correlations, file = "correlations.csv")
 ```
+
+# Correlation with different ratings
+
+```{r fig.height=8, fig.width=8}
+# compute correlation matrix with only ratings features
+ratings_data = data[, c(ratings_fts_names)]
+
+# correlation matrix only for ratings features
+ratings_correlation_matrix = cor(ratings_data)
+
+# Plot a heatmap of the correlation matrix
+ggplot(data = reshape2::melt(ratings_correlation_matrix)) +
+  geom_tile(aes(x = Var1, y = Var2, fill = value)) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab",
+                       name="Correlation") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                    size = 10, hjust = 1)) +
+  coord_fixed()
+
+par(mfrow = c(1, 1))
+
+```
+```{r}
+# Assuming you have already calculated the 'ratings_correlation_matrix' using the code you provided.
+
+# Convert the correlation matrix to a data frame to work with it easily
+ratings_correlation_df <- as.data.frame(as.table(ratings_correlation_matrix))
+
+# Rename the columns in the data frame
+colnames(ratings_correlation_df) <- c("Var1", "Var2", "Correlation")
+
+# Sort the data frame by the absolute correlation values in descending order
+sorted_correlation_df <- ratings_correlation_df[order(-abs(ratings_correlation_df$Correlation)), ]
+
+# Filter out the self-correlations (correlation of a variable with itself)
+sorted_correlation_df <- sorted_correlation_df[sorted_correlation_df$Var1 != sorted_correlation_df$Var2, ]
+
+# Print the top N most correlated features
+N <- 15  # Change N to get more or fewer correlated features
+top_correlated_features <- head(sorted_correlation_df, N)
+
+print(top_correlated_features)
+
+```
+
 
 # Relation between Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes (linear)
 
@@ -478,25 +570,4 @@ plot(arrival_std, departure_std, xlab = "Arrival_Delay_in_Minutes", ylab = "Depa
 abline(0, 1, col = "red")
 ```
 
-```{r}
-# print table of type of travel by satisfacton
-table(data$Type_of_Travel, data$satisfaction)
-```
 
-```{r}
-
-# select examples of departure delay greater than 500
-examples=data[data$Departure_Delay_in_Minutes > 800,] 
-# and print table of satisfaction by departure delay
-table(examples$satisfaction)
-
-# count the number of examples with departure delay = 0
-sum(data$Departure_Delay_in_Minutes > 0)
-sum(data$Departure_Delay_in_Minutes <= 0)
-
-sum(data$Arrival_Delay_in_Minutes > 0)
-sum(data$Arrival_Delay_in_Minutes <= 0)
-
-summary(data)
-
-```
