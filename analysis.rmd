@@ -509,6 +509,7 @@ par(mfrow = c(1, 1))
 ```{r fig.height=8, fig.width=8}
 # compute correlation matrix with only ratings features
 ratings_data = data[, c(ratings_fts_names)]
+ratings_data <- apply(ratings_data, 2, as.numeric)
 
 # correlation matrix only for ratings features
 ratings_correlation_matrix = cor(ratings_data)

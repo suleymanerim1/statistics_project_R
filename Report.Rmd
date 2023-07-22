@@ -1,0 +1,1256 @@
+---
+title: "EDA"
+author: "Süleyman Erim, Giacomo Schiavo, Mattia Varagnolo"
+date: "`r Sys.Date()`"
+output: pdf_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction to data
+
+This section introduces the purpose of the exploratory data analysis
+(EDA) and sets up the necessary libraries and data files.
+
+```{r message=FALSE}
+# import libraries
+library(tidyverse)
+library(corrplot)
+library(ggplot2)
+library(gridExtra)
+library(correlation)
+library(reshape)
+library(reshape2)
+```
+
+
+```{r message=FALSE}
+data_train = read.csv("train.csv")
+data_test = read.csv("test.csv")
+
+# merge train and test data
+data = rbind(data_train, data_test)
+attach(data)
+```
+
+
+# Introduction
+In this project, we will predict whether a passenger will be satisfied or dissatisfied with the services offered by an airline company. The dataset comprises a survey on airline passenger satisfaction.
+
+The main objectives of this project are to identify the factors that have a strong correlation with passenger satisfaction or dissatisfaction and to develop a predictive model for passenger satisfaction.
+
+The dataset: https://www.kaggle.com/datasets/teejmahal20/airline-passenger-satisfaction
+
+
+Here are the variables in the dataset:
+
+- Gender: Gender of the passengers (Female, Male)
+- Customer Type: The customer type (Loyal customer, disloyal customer)
+- Age: The actual age of the passengers
+- Type of Travel: Purpose of the flight of the passengers (Personal Travel, Business Travel)
+- Class: Travel class in the plane of the passengers (Business, Eco, Eco Plus)
+- Flight distance: The flight distance of this journey
+- Inflight wifi service: Satisfaction level of the inflight wifi service (0: Not Applicable; 1-5)
+- Departure/Arrival time convenient: Satisfaction level of Departure/Arrival time convenient
+- Ease of Online booking: Satisfaction level of online booking
+- Gate location: Satisfaction level of Gate location
+- Food and drink: Satisfaction level of Food and drink
+- Online boarding: Satisfaction level of online boarding
+- Seat comfort: Satisfaction level of Seat comfort
+- Inflight entertainment: Satisfaction level of inflight entertainment
+- On-board service: Satisfaction level of On-board service
+- Leg room service: Satisfaction level of Leg room service
+- Baggage handling: Satisfaction level of baggage handling
+- Check-in service: Satisfaction level of Check-in service
+- Inflight service: Satisfaction level of inflight service
+- Cleanliness: Satisfaction level of Cleanliness
+- Departure Delay in Minutes: Minutes delayed when departure
+- Arrival Delay in Minutes: Minutes delayed when Arrival
+- Satisfaction: Airline satisfaction level (Satisfaction, neutral or dissatisfaction)
+
+
+The objective of our report is to predict passenger satisfaction with airline services based on the provided dataset, which includes various demographic and satisfaction-related variables such as gender, age, travel type, flight class, and satisfaction levels with different aspects of the journey. 
+The dataset represents a survey on airline passenger satisfaction and will be used to develop a predictive model to determine whether passengers will be satisfied or dissatisfied with the airline services.
+
+Now we're going to get a summary of all the features in our dataset:
+```{r}
+summary(data)
+```
+
+From the summary, it is evident that many features represent ratings on the services provided by the airline agency, and these ratings range from 0 to 5. Additionally, we noticed that the "Arrival Delay in Minutes" feature contains some missing values (NA).
+
+Next, we will examine the distribution of all nominal features. Specifically, we have categorical data for Gender, Customer Type, Type of Travel, and Class, while all the rating features are ordinal.
+
+```{r}
+table(data$Gender)
+```
+The "Gender" feature appears to be well-balanced, meaning that it has an approximately equal number of occurrences for each category, likely male and female. This balance can be beneficial for modeling as it prevents any significant bias towards a particular gender in the analysis and predictions.
+
+```{r}
+table(data$Customer.Type)
+```
+The "Customer Type" feature contains only two values, "disloyal customer" and "loyal customer." The distribution of values is imbalanced, with one category potentially having significantly more occurrences than the other.
+```{r}
+table(data$Type.of.Travel)
+```
+The "Type of Travel" feature consists of only two values: "personal travel" and "business travel." The distribution of values is imbalanced, with "business travel" occurring twice as much as "personal travel."
+
+```{r}
+table(data$Class)
+```
+The "Class" feature contains three values: "business," "eco plus," and "eco." The distribution of values is imbalanced. "Business" and "eco" classes appear to be relatively balanced, while "eco plus" is significantly underrepresented compared to the other two classes.
+
+```{r}
+table(data$satisfaction)
+```
+The "satisfaction" feature, which serves as our target variable, is an important aspect of the analysis. The values for this feature are not perfectly balanced, meaning that there is an unequal distribution of satisfied and dissatisfied passengers in the dataset.
+
+# Data preprocessing
+
+In this section of data preprocessing, several steps are performed to prepare the dataset for further analysis and modeling. The specific actions taken include:
+
+1. Renaming columns: the names of the features (columns) are modified to improve their clarity and usability. 
+
+2. Dropping unnecessary columns: two columns, "X" and "id," are removed from the dataset. The "X" column likely represents the index of the row, which does not carry any meaningful information for analysis. The "id" column is presumed to be an unknown indexing number, which may not contribute to the predictive modeling process.
+
+3. Converting categorical variables to factors: categorical variables, such as "Gender", "Customer Type", "Type of Travel" and "Class" are converted into factors. Converting categorical variables into factors is a common practice in R to represent these variables as distinct levels, allowing for better handling and analysis in statistical models.
+
+By performing these data preprocessing steps, the dataset is cleaned and transformed into a more suitable format for the subsequent analysis, making it easier to build a predictive model for passenger satisfaction.
+
+```{r}
+# replace dots with underscores in column names
+names(data) = gsub("\\.", "_", names(data))
+# drop X and id column
+data = data %>% select(-X, -id)
+names(data)
+```
+
+```{r}
+# convert categorical features to factor
+data$Gender = factor(data$Gender, levels = c("Male", "Female"))
+data$Customer_Type = factor(data$Customer_Type, levels = c("Loyal Customer", "disloyal Customer"))
+data$Type_of_Travel = factor(data$Type_of_Travel, levels = c("Personal Travel", "Business travel"))
+data$Class = factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))
+data$satisfaction = factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))
+
+ratings_fts_names = c("Inflight_wifi_service", "Departure_Arrival_time_convenient", 
+  "Ease_of_Online_booking", "Gate_location", "Food_and_drink", "Online_boarding", 
+  "Seat_comfort", "Inflight_entertainment", "On_board_service", "Leg_room_service", 
+  "Baggage_handling", "Checkin_service", "Inflight_service", "Cleanliness", "On_board_service")
+
+for (col in ratings_fts_names) {
+  data[[col]] = factor(data[[col]], levels = c(0:5))
+}
+
+```
+
+# Handling na values
+
+In this section, we analyze the dataset to identify variables with missing values, particularly focusing on the "Arrival_Delay_in_Minutes" variable. We calculate the proportion of missing values for this variable and subsequently remove the examples or rows with missing values from the dataset.
+
+```{r}
+# list features with na values
+prop.table(colSums(is.na(data)))
+```
+
+To determine the proportion of missing values for the "Arrival_Delay_in_Minutes" variable, we can count the number of instances where this variable has missing values (commonly denoted as "NaN" or "NA") and divide it by the total number of examples in the dataset. This will give us the proportion of missing values for the "Arrival_Delay_in_Minutes" variable.
+
+```{r}
+# Arrival_Delay_in_Minutes has na values, proportion of na values
+prop.table(table(is.na(data$Arrival_Delay_in_Minutes)))
+```
+Indeed, since the proportion of missing values for the "Arrival_Delay_in_Minutes" variable is very low (less than 3% of the entire dataset), it is reasonable to proceed with dropping these missing values from the dataset. 
+```{r}
+# na values are only 0.03% of the data -> drop na values
+data = data %>% drop_na(Arrival_Delay_in_Minutes)
+```
+
+# Outliers
+
+In this section, box plots are created for each numeric variable present in the dataset. Box plots are a powerful visualization tool used to identify the presence of outliers in the data. For each numeric variable, the box plot displays a box that represents the interquartile range (IQR), with the median indicated by a line inside the box. The "whiskers" extending from the box show the range of the data, and any data points beyond the whiskers are considered potential outliers.
+
+By examining the box plots for each numeric variable, we can visually identify any data points that lie far outside the typical range of the data, indicating potential outliers. Outliers can significantly impact statistical analyses, so detecting and handling them appropriately is crucial for ensuring the integrity of the dataset and the accuracy of subsequent analyses and modeling.
+
+```{r}
+
+# plot boxplot of each numeric variable excluding ratings features
+plots = list()
+for (col in names(data)[sapply(data, is.numeric)]) {
+  if (col %in% ratings_fts_names) {
+    next
+  }
+  plot = ggplot(data, aes(x = .data[[col]])) +
+  geom_boxplot() +
+  labs(title = col, x = col, y = "Count") 
+  plots[[col]] = plot
+}
+
+grid.arrange(grobs = plots, ncol = 2)
+```
+We can see that there are outliers in Departure_Delay_in_Minutes, Arrival_Delay_in_Minutes and Flight_Distance.
+Considering the presence of both near-zero and very large values in the dataset, alternative distributions like the log-normal distribution may be more appropriate for modeling the "Departure_Delay_in_Minutes" and "Arrival_Delay_in_Minutes" variables, as they can better capture the variability in delay times.
+
+# Visualization
+
+In this section, histograms are used to visualize the distribution of the variables in the dataset, starting with the nominal features. By creating histograms for the nominal features, we can gain insights into the distribution of categories within each feature.
+
+Upon visualizing the nominal features, it becomes apparent that some features exhibit heavily unbalanced distributions. This means that certain categories within these features have significantly higher frequencies compared to others. The presence of such imbalanced distributions could have implications for analysis and modeling, as it may lead to biased results or difficulties in predicting less frequent categories accurately.
+
+```{r fig.height=8, fig.width=8}
+# plot distribution of categorical variables
+plots = list()
+for (col in names(data)[sapply(data, is.factor)]) {
+  if (col %in% ratings_fts_names) {
+    next
+  }
+  plot = ggplot(data, aes(x = .data[[col]], fill = .data[[col]])) +
+  geom_bar() +
+  labs(title = paste("Histogram of", col), x = col, y = "Count") +
+  guides(fill = FALSE)
+
+  plots[[col]] = plot
+}
+
+grid.arrange(grobs = plots, ncol = 2)
+```
+From the analysis of the nominal features, we can observe the following regarding their balance:
+
+1. Gender: The "Gender" feature is almost perfectly balanced, meaning that there is a relatively equal representation of both genders in the dataset.
+
+2. Satisfaction: The target feature appears to be imbalanced, with fewer instances of "satisfied" compared to the other class ("dissatisfied"). This imbalance could potentially impact the model's performance, and we need to handle it appropriately during the modeling process.
+
+3. Type of Travel: The "Type of Travel" feature shows an imbalance, with more instances of "business travel" compared to "personal travel."
+
+4. Class: The "Class" feature also exhibits imbalance, with "business" and "eco" classes having relatively balanced representations, while the "Eco Plus" class is underrepresented.
+
+5. Customer Type: The "Customer Type" feature shows an imbalance, with a higher number of "loyal customer" instances compared to "disloyal customer."
+
+When dealing with imbalanced data, we need to take specific measures during model training and evaluation to ensure that the model performs well and doesn't exhibit bias towards the majority class. 
+Appropriate techniques such as resampling, using different evaluation metrics or employing specialized algorithms can help address the imbalance and lead to a more accurate and fair predictive model.
+
+Now we plot the distribution of ratings features.
+
+```{r fig.height=18, fig.width=12}
+# plot distribution of ratings features
+plots = list()
+my_palette <- c("#1f78b4", "#33a02c", "#e31a1c", "#ff7f00", "#6a3d9a", "#b15928")
+
+for (col in names(data)[sapply(data, is.factor)]) {
+  if (!col %in% ratings_fts_names) {
+    next
+  }
+  plot <- ggplot(data, aes(x = .data[[col]], fill = factor(.data[[col]]))) +
+    geom_bar() +
+    geom_text(stat = 'count', aes(label = after_stat(count))) +  
+    labs(title = paste("Histogram of ", col), x = col, y = "Count") +
+    scale_fill_manual(values = my_palette) +
+    guides(fill = FALSE)
+
+  plots[[col]] <- plot
+}
+grid.arrange(grobs = plots, ncol = 3)
+```
+Based on the graphs showing the histograms of the ratings, we can observe that the majority of them tend to fall between 3 and 4. This conclusion is drawn from the visual representation of the data, where the histogram bars are higher in the range of 3 to 4, indicating a higher frequency of ratings in that range.
+
+```{r}
+# compute the mean value of all the ratings
+ratings_data = data[, c(ratings_fts_names)]
+ratings_data <- apply(ratings_data, 2, as.numeric)
+ratings_mean = colMeans(ratings_data)
+ratings_mean
+```
+
+
+This section includes histograms to visualize the distribution of
+numeric variables in the dataset.
+
+**needs interpretation **
+
+```{r fig.width=8}
+# plot distribution and density of numeric variables excluding ratings features
+plots = list()
+for (col in names(data)[sapply(data, is.numeric)]) {
+  if (col %in% ratings_fts_names) {
+    next
+  }
+  plot = ggplot(data, aes(x = .data[[col]])) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, alpha = 0.5) +
+  geom_density(alpha = 0.2, fill = "red") +
+  labs(title = paste("Histogram of", col), x = col, y = "Count") 
+
+  plots[[col]] = plot
+}
+
+grid.arrange(grobs = plots, ncol = 2)
+```
+
+# Visualization vs satisfaction
+
+The observations from the graph analysis provide valuable insights into how different nominal features relate to passenger satisfaction:
+1. Gender: both males and females appear to have similar distributions in terms of satisfaction, indicating that gender may not be a strong predictor of passenger satisfaction. The distributions closely resemble the overall distribution of the satisfaction feature.
+2. Customer type: the graph suggests that "disloyal customers" are more likely to be unsatisfied or neutral compared to "loyal customers." This indicates that customer loyalty may play a role in passenger satisfaction, with loyal customers tending to be more satisfied.
+3. Type of travel: The graph indicates that "personal travelers" are more likely to be unsatisfied compared to "business travelers." Conversely, "business travelers" tend to have a higher proportion of satisfied passengers. This finding suggests that the purpose of travel may have an influence on passenger satisfaction.
+4. Class: The graph shows that "business class" passengers are more satisfied than unsatisfied, whereas "eco" and "eco plus" passengers tend to have a higher proportion of unsatisfied passengers. This suggests that the class of service provided by the airline may be a significant factor affecting passenger satisfaction.
+
+```{r fig.width=10}
+# plots categorical variables vs satisfaction
+plots = list()
+for (col in names(data)[sapply(data, is.factor)]) {
+  if (col == "satisfaction" || col %in% ratings_fts_names) {
+    next
+  }
+  plot = ggplot(data, aes(x = satisfaction, fill = .data[[col]])) +
+  theme_minimal() +
+  geom_bar(position = "dodge") +
+  labs(title = paste("Histogram of Satisfaction by", col), x = "Satisfaction", y = "Count")
+
+  plots[[col]] = plot
+  
+}
+
+grid.arrange(grobs = plots, ncol = 2)
+```
+
+Based on the observed distribution of the ratings, we can draw the following conclusion:
+1. For most of the ratings, the mean value for unsatisfied/neutral consumers is around 3, except for "Inflight Service" and "Baggage Handling." 
+```{r}
+# calculate the mean of the ratings of unsatisfied/neutral consumers
+ratings_data = data[data$satisfaction == "neutral or dissatisfied", c(ratings_fts_names)]
+ratings_data <- apply(ratings_data, 2, as.numeric)
+ratings_mean = colMeans(ratings_data)
+ratings_mean
+```
+2. For most of the ratings given by satisfied consumers, the mean value is around 4. However, it's important to note that we cannot generalize from this information alone. 
+```{r}
+# calculate the mean of the ratings of unsatisfied/neutral consumers
+ratings_data = data[data$satisfaction == "satisfied", c(ratings_fts_names)]
+ratings_data <- apply(ratings_data, 2, as.numeric)
+ratings_mean = colMeans(ratings_data)
+ratings_mean
+```
+
+```{r fig.height=22, fig.width=10}
+# plots ratings features vs satisfaction
+plots = list()
+for (col in names(data)[sapply(data, is.factor)]) {
+  if (!col %in% ratings_fts_names) {
+    next
+  }
+  plot = ggplot(data, aes(x = .data[[col]], fill = satisfaction)) +
+  theme_minimal() +
+  geom_bar(position = "dodge") +
+  labs(title = paste("Histogram of Satisfaction by", col), x = "Satisfaction", y = "Count")
+
+  plots[[col]] = plot  
+}
+
+grid.arrange(grobs = plots, ncol = 2)
+```
+
+Based on the boxplots and the information provided, we can make the following observations about the distributions of the numerical features:
+
+1. Age: the boxplot for "Age" suggests that the distribution is approximately normal. This is indicated by the symmetric shape of the box, with the median line dividing it quite evenly.
+
+2. Flight Distance: the boxplot does not exhibit a normal distribution. Instead, it appears to have a right-skewed distribution. This is evident from the longer whisker on the right side, indicating that there are some outliers with larger flight distances.
+
+3. Departure Delay in Minutes: the boxplot for "Departure Delay in Minutes" also shows a right-skewed distribution. The majority of the data appears to be concentrated towards the lower values, with a lot of outliers representing longer departure delays.
+
+4. Arrival Delay in Minutes: similar to the "Departure Delay in Minutes," the boxplot for "Arrival Delay in Minutes" exhibits a right-skewed distribution. The bulk of the data is clustered towards the lower values, with a lot of outliers indicating longer arrival delays.
+
+Based on these observations, it's essential to consider the appropriate data transformations or use different distribution models when working with "Flight Distance," "Departure Delay in Minutes," and "Arrival Delay in Minutes." For example, logarithmic transformations may be suitable to handle the skewed nature of these variables in statistical analyses and modeling tasks.
+```{r fig.height=10, fig.width=10}
+# plots numeric variables vs satisfaction excluding ratings features
+plots = list()
+
+for (col in names(data)[sapply(data, is.numeric)]) {
+  if (col %in% ratings_fts_names) {
+    next
+  }
+  plot = ggplot(data, aes(x = satisfaction, y = .data[[col]])) +
+  theme_minimal() +
+  geom_boxplot() +
+  labs(title = paste("Boxplot of Satisfaction by", col), x = "Satisfaction", y = col)
+
+  plots[[col]] = plot  
+}
+
+grid.arrange(grobs = plots, ncol = 2)
+
+```
+
+# Convert categorical to numerical
+
+This section converts the categorical variables to numeric
+representation for further analysis.
+
+```{r}
+gender_map = c("Male" = 0, "Female" = 1)
+data$Gender = gender_map[as.numeric(data$Gender)]
+
+customer_type_map = c("Loyal Customer" = 0, "disloyal Customer" = 1)
+data$Customer_Type = customer_type_map[as.numeric(data$Customer_Type)]
+
+type_of_travel_map = c("Personal Travel" = 0, "Business travel" = 1)
+data$Type_of_Travel = type_of_travel_map[as.numeric(data$Type_of_Travel)]
+
+class_map = c("Business" = 0, "Eco" = 1, "Eco Plus" = 2)
+data$Class = class_map[as.numeric(data$Class)]
+```
+
+
+```{r}
+satisfaction_map = c("neutral or dissatisfied" = 0, "satisfied" = 1)
+data$satisfaction = satisfaction_map[as.numeric(data$satisfaction)]
+```
+
+# Data balance
+
+This section calculates the proportion of satisfied and dissatisfied
+customers in the dataset.
+
+```{r}
+prop.table(table(data$satisfaction))
+```
+
+# Train test split
+
+This section splits the data into training and testing sets, prints the
+proportion of satisfied and dissatisfied customers in each set, and
+saves the true values of the target variable for the test set.
+
+```{r}
+set.seed(123)
+train_index = sample(1:nrow(data), 0.8*nrow(data))
+# 80% of data is used for training
+train = data[train_index,]
+# 20% of data is used for testing
+test = data[-train_index,]
+
+# merge train and test data
+data = rbind(train, test)
+# save on cvs
+# write.csv(data, "data.csv")
+
+# save true values of test satisfaction column
+test_true = test$satisfaction
+
+# drop satisfaction column from test data
+test = test %>% select(-satisfaction)
+
+# print proportion of satisfied and dissatisfied customers in train and test data
+prop.table(table(train$satisfaction))
+prop.table(table(test_true))
+```
+
+# Correlation matrix
+
+This section calculates the correlation matrix for numeric variables and
+plots a heatmap to visualize the correlations between variables.
+
+```{r fig.height=12, fig.width=12}
+# correlation matrix only for numeric variables
+correlation_matrix = cor(data[, sapply(data, is.numeric)])
+
+# Plot a heatmap of the correlation matrix
+ggplot(data = reshape2::melt(correlation_matrix)) +
+  geom_tile(aes(x = Var1, y = Var2, fill = value)) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab",
+                       name="Correlation") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                    size = 10, hjust = 1)) +
+  coord_fixed()
+
+par(mfrow = c(1, 1))
+```
+
+```{r}
+# Find high correlated features with satisfaction
+# TODO: do the same with different threshold to find differences
+# NOTE: i decided to use 0.3 as threshold
+satisfaction_corr <- correlation_matrix['satisfaction',]
+high_corr_satis <- names(satisfaction_corr[abs(satisfaction_corr) > 0.3 | abs(satisfaction_corr) < -0.3])
+high_corr_satis <- high_corr_satis[high_corr_satis != "satisfaction"]
+high_corr_satis
+```
+
+```{r}
+# Compute the correlations between the high correlation features and satisfaction
+correlations <- data.frame(
+  feature = high_corr_satis,
+  correlation = sapply(high_corr_satis, function(x) cor(data[,x], data$satisfaction))
+)
+correlations
+```
+
+```{r}
+# plot the correlations
+ggplot(correlations, aes(x = reorder(feature, correlation), y = correlation)) +
+  geom_bar(stat = "identity", fill = "blue", alpha = 0.4) +
+  ggtitle("Correlation between features and satisfaction") +
+  xlab('Features') +
+  ylab('Correlation')
+
+par(mfrow = c(1, 1))
+```
+
+```{r}
+#save on cvs
+# write.csv(correlations, file = "correlations.csv")
+```
+
+# Correlation with different ratings
+
+```{r fig.height=8, fig.width=8}
+# compute correlation matrix with only ratings features
+ratings_data = data[, c(ratings_fts_names)]
+ratings_data <- apply(ratings_data, 2, as.numeric)
+
+# correlation matrix only for ratings features
+ratings_correlation_matrix = cor(ratings_data)
+
+# Plot a heatmap of the correlation matrix
+ggplot(data = reshape2::melt(ratings_correlation_matrix)) +
+  geom_tile(aes(x = Var1, y = Var2, fill = value)) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab",
+                       name="Correlation") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                    size = 10, hjust = 1)) +
+  coord_fixed()
+
+par(mfrow = c(1, 1))
+
+```
+```{r}
+# Assuming you have already calculated the 'ratings_correlation_matrix' using the code you provided.
+
+# Convert the correlation matrix to a data frame to work with it easily
+ratings_correlation_df <- as.data.frame(as.table(ratings_correlation_matrix))
+
+# Rename the columns in the data frame
+colnames(ratings_correlation_df) <- c("Var1", "Var2", "Correlation")
+
+# Sort the data frame by the absolute correlation values in descending order
+sorted_correlation_df <- ratings_correlation_df[order(-abs(ratings_correlation_df$Correlation)), ]
+
+# Filter out the self-correlations (correlation of a variable with itself)
+sorted_correlation_df <- sorted_correlation_df[sorted_correlation_df$Var1 != sorted_correlation_df$Var2, ]
+
+# Print the top N most correlated features
+N <- 15  # Change N to get more or fewer correlated features
+top_correlated_features <- head(sorted_correlation_df, N)
+
+print(top_correlated_features)
+
+```
+
+
+# Relation between Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes (linear)
+
+This section explores the partial correlation matrix and identifies
+variables with high correlations with the target variable
+(satisfaction). It also creates a bar plot to show the correlations.
+
+```{r}
+
+#CORRELATION MATRIX again but now we are interested in partial correlation
+#So we look for all the correlations between variables
+#We pick the highest, setting a treshold of our choice
+
+#build a dataframe where for each variable we look the partial correlation with all the others
+#we pick the highest and we save it in a dataframe
+#we set a treshold of 0
+
+
+#correlation(train, partial=TRUE, method='pearson')
+#save the partial correlation matrix result in a dataframe and output a file for further analysis
+
+
+#partial_corr <- correlation(train, partial=TRUE, method='pearson')
+#write.csv(partial_corr, file = "partial_corr.csv")
+
+partial_correlations = read.csv("partial_corr.csv", header = TRUE, sep = ",")
+
+#make the first column the row names
+rownames(partial_correlations) = partial_correlations[,1]
+
+#drop the first  (X) column
+partial_correlations = partial_correlations[,-1]
+
+# Create a new matrix with rounded partial correlations
+partial_correlations_rounded <- round(partial_correlations, digits = 3)
+
+
+# Initialize empty data frame with 0 rows
+# We need it to create a data frame with the results and
+# so to show better the correlations.
+df <- data.frame(variable1 = character(),
+                 variable2 = character(),
+                 value = numeric(),
+                 stringsAsFactors = FALSE)
+
+# Loop over rows and columns of matrix
+for (i in 1:nrow(partial_correlations_rounded)) {
+  for (j in 1:ncol(partial_correlations_rounded)) {
+    # Check if value meets criterion
+    if ((partial_correlations_rounded[i,j] > 0.300 | partial_correlations_rounded[i,j] < -0.300)& i != j) {
+      # Add row to data frame
+      df <- rbind(df, data.frame(variable1 = rownames(partial_correlations_rounded)[i],
+                                 variable2 = colnames(partial_correlations_rounded)[j],
+                                 value = partial_correlations_rounded[i,j],
+                                 stringsAsFactors = FALSE))
+    }
+  }
+}
+
+
+# Group the data frame by variable1 and extract top 3 values for each group
+df_top3 <- df %>% group_by(variable1) %>% top_n(4, value) %>% ungroup()
+
+#order by variable1
+df_top3 <- df_top3[order(df_top3$variable1),]
+
+
+#delete duplicates in the dataframe if variable1 is equal to variable2
+df_top3 <- df_top3[!(df_top3$variable1 == df_top3$variable2),]
+
+print(df_top3, n = nrow(df_top3))
+#save on cvs
+# write.csv(df_top3, file = "df_top3.csv")
+```
+
+```{r}
+# standardize Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes
+arrival_std = scale(data$Arrival_Delay_in_Minutes)
+departure_std = scale(data$Departure_Delay_in_Minutes)
+# scatter plot of Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes 
+plot(arrival_std, departure_std, xlab = "Arrival_Delay_in_Minutes", ylab = "Departure_Delay_in_Minutes")
+# plot line y = x
+abline(0, 1, col = "red")
+```
+
+
+# Data Preparation
+## Import Data
+```{r message=FALSE}
+
+# Read the training data from CSV file
+train_data <- read.csv("train_encoded.csv")
+
+# Drop the first column
+train_data <- train_data[, -1]
+
+# Read the test data from CSV file
+test_data <- read.csv("test_encoded.csv")
+
+# Drop the first column
+test_data <- test_data[, -1]
+
+```
+
+## Features and Outputs
+```{r}
+
+# Seperate y_train and y_test for further use
+X_train = as.matrix(train_data %>% select(-satisfaction))
+y_train = train_data$satisfaction
+
+X_test = as.matrix(test_data %>% select(-satisfaction))
+y_test = test_data$satisfaction
+```
+
+## Number of Samples
+```{r}
+# Number of samples in train data
+train_rows <- nrow(train_data)
+print(train_rows)
+
+# Number of samples in test data
+test_rows <- nrow(test_data)
+print(test_rows)
+```
+
+## Data Balance
+```{r}
+# Proportion of satisfied and unsatisfied customers for train data
+prop.table(table(y_train))
+# Proportion of satisfied and unsatisfied customers for test data
+prop.table(table(y_test))
+```
+As we can see the proportion of binary classes in train and test are similar. We can say that our test data is representative of train data.
+
+In this project we want to find unsatisfied customers (class 0). We hypothesis that if we find the unsatisfied customers, then we arrange our customer satisfaction campaign accordingly.
+
+# Classification Models
+
+Classification, a form of supervised learning, involves predicting the qualitative response of an observation by assigning it to a specific category or class. Multivariate techniques excel in constructing prediction models, forming the foundation of statistical classification. In the realm of machine learning, this process is referred to as supervised learning.
+
+To build a classifier, we utilize a set of training observations. From a geometric perspective, an allocation rule determines how the input space is divided into regions, each labeled according to its classification. The boundaries of these regions can vary based on the assumptions made when constructing the classification model.
+
+## Logistic Regression
+
+In logistic model observations are assumed to be realizations of independent Bernoulli random variables. It is like if a customer will be satisfied with flight or not.
+
+### Basic Logistic Classifier
+```{r}
+# Model definition with all features:
+glm_full<- glm(data = train_data,satisfaction ~ .,
+                family = "binomial")
+# summary of full model
+summary(glm_full)
+```
+As we can see from model statistics, the p value of "flight distance" feature is not lower than 0.5 which indicates that the effect of "flight distance" on prediction of satisfaction is insignificant. However, we would like to keep all features in the model for now. Then we will full model with feature selection models.
+
+In the code snippet below, we can observe the calculation goodness of fit, also known as R-squared (R²). R² serves as a metric to assess how well the GLM (Generalized Linear Model) model aligns with the given data in comparison to a null model, which solely consists of an intercept without any predictors. The R² value is derived using a simple formula: 1 minus the ratio of the deviance of the fitted model to the deviance of the null model. 
+
+R² value provides insights into the amount of variation in the data that can be accounted for by the model, thus serving as a measure of its effectiveness.
+
+```{r}
+r2<- 1 - (summary(glm_full)$deviance/summary(glm_full)$null.deviance)
+r2
+```
+
+
+In the provided line of code, the calculation of the variance inflation factor (VIF) is performed by taking the reciprocal of 1 minus the R² value. The VIF serves as a metric to evaluate the presence of multicollinearity, which refers to the correlation between predictor variables within a model. High levels of multicollinearity can introduce issues regarding the reliability and interpretability of the GLM (Generalized Linear Model).
+
+```{r}
+1/(1-r2)
+```
+
+
+
+### Logistic Regression with Backward Variable Selection
+
+Collinearity refers to a situation where two or more predictor variables in a statistical model are closely related to each other. The presence of collinearity can introduce instability to the model and make it more challenging to accurately estimate the effect of each predictor variable.
+
+Ideally, we aim for low collinearity among predictor variables. When collinearity is low, it implies that the predictor variables are independent or weakly correlated, allowing for more reliable estimation of their individual effects on the model.
+
+The Variance Inflation Factor (VIF) is a measure used to assess collinearity among predictor variables within a multiple regression model. It is computed by taking the ratio of the variance of all the weights in the model divided by the variance of a single weight if that particular predictor variable were fitted alone.
+
+A VIF of 1 indicates no collinearity, while a VIF between 1 and 5 suggests moderate collinearity. On the other hand, a VIF greater than 5 indicates high collinearity, which is undesirable and should be avoided.
+
+To address high collinearity, we may choose to remove certain predictor variables from the model and observe the impact on the corresponding R-squared value. By iteratively adjusting the predictor variables, we can determine a suitable set of variables that minimize collinearity and yield a more robust model.
+
+Variable selection is crucial in regression models to ensure interpretability, computational efficiency, and generalization. It involves removing irrelevant variables, reducing redundancy, and combating overfitting. By choosing relevant variables, the model becomes easier to interpret, algorithms work faster with high-dimensional data, and overfitting is reduced. The focus is on low test error rather than training error. Variable selection is especially important for high-dimensional datasets with more features than observations. Here, we are gonna use backward selection starting from full model and reducing number of variables in order of high VIF factor to lower VIF factors to decrease multi-collinearity and increase robustness of model.
+
+```{r}
+
+# VIF Iteration 0
+# The process is done iteratively where we delete one variable at time
+vif_values <- VIF(glm_full)
+
+# Create a data frame with variable names and their corresponding VIF values
+vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
+
+# Sort the data frame in decreasing order of VIF values
+sorted_df <- vif_df[order(-vif_df$VIF), ]
+rownames(sorted_df) <- NULL
+
+# Print the sorted data frame
+print(sorted_df)
+```
+```{r}
+# VIF Iteration 1
+# The process is done iteratively where we delete one variable at time
+# Model definition:
+glm_vif1<- glm(data = train_data,
+                satisfaction ~ .-Arrival_Delay_in_Minutes,
+                family = "binomial")
+vif_values <- VIF(glm_vif1)
+
+# Create a data frame with variable names and their corresponding VIF values
+vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
+
+# Sort the data frame in decreasing order of VIF values
+sorted_df <- vif_df[order(-vif_df$VIF), ]
+rownames(sorted_df) <- NULL
+
+# Print the sorted data frame
+print(sorted_df)
+```
+
+```{r}
+# VIF Iteration 2
+# The process is done iteratively where we delete one variable at time
+# Model definition:
+glm_vif2<- glm(data = train_data,
+                satisfaction ~ .
+               -Arrival_Delay_in_Minutes
+               -Inflight_entertainment,
+                family = "binomial")
+vif_values <- VIF(glm_vif2)
+
+# Create a data frame with variable names and their corresponding VIF values
+vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
+
+# Sort the data frame in decreasing order of VIF values
+sorted_df <- vif_df[order(-vif_df$VIF), ]
+rownames(sorted_df) <- NULL
+
+# Print the sorted data frame
+print(sorted_df)
+```
+
+```{r}
+# VIF Iteration 3
+# The process is done iteratively where we delete one variable at time
+# Model definition:
+glm_vif3<- glm(data = train_data,
+                satisfaction ~ .
+                -Arrival_Delay_in_Minutes
+                -Inflight_entertainment
+                -Ease_of_Online_booking	,
+                family = "binomial")
+vif_values <- VIF(glm_vif3)
+
+# Create a data frame with variable names and their corresponding VIF values
+vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
+
+# Sort the data frame in decreasing order of VIF values
+sorted_df <- vif_df[order(-vif_df$VIF), ]
+rownames(sorted_df) <- NULL
+
+# Print the sorted data frame
+print(sorted_df)
+```
+
+```{r}
+# VIF Iteration 4
+# The process is done iteratively where we delete one variable at time
+# Model definition:
+glm_vif4<- glm(data = train_data,
+                satisfaction ~ .
+               -Arrival_Delay_in_Minutes
+               -Inflight_entertainment
+               -Ease_of_Online_booking 
+               -Cleanliness	,
+                family = "binomial")
+vif_values <- VIF(glm_vif4)
+
+# Create a data frame with variable names and their corresponding VIF values
+vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
+
+# Sort the data frame in decreasing order of VIF values
+sorted_df <- vif_df[order(-vif_df$VIF), ]
+rownames(sorted_df) <- NULL
+
+# Print the sorted data frame
+print(sorted_df)
+```
+
+We deleted all the features with VIF greater than 2 to decrease multicollinearity. Let's check the current model statistics.
+
+```{r}
+glm_reduced<- glm(data = train_data,
+                satisfaction ~ .
+                -Arrival_Delay_in_Minutes
+                -Inflight_entertainment
+                -Ease_of_Online_booking 
+                -Cleanliness	,
+                family = "binomial")
+# Observation of the model summary:
+summary(glm_reduced)
+```
+"Flight_Distance" and "Gate_location" features are insignificant in prediction of satisfaction. Let's drop them from model.
+
+```{r}
+# Drop Flight_Distance and Gate_location from model.
+
+glm_backward<- glm(data = train_data,
+                satisfaction ~ .
+                -Arrival_Delay_in_Minutes
+                -Inflight_entertainment
+                -Ease_of_Online_booking 
+                -Cleanliness
+                -Flight_Distance
+                -Gate_location,
+                family = "binomial")
+```
+
+Interestingly, model with backward elimination variable selection has less R² value than full model. We will discuss the reason at the end of Logistic Regression part. 
+
+```{r}
+r2<- 1 - (summary(glm_backward)$deviance/summary(glm_backward)$null.deviance)
+r2
+```
+
+
+### Logistic Regression with Shrinkage Method
+
+Shrinkage methods, such as Ridge and Lasso regression, are techniques used in linear modeling to control model complexity and reduce overfitting. Instead of selecting a subset of predictors or setting some coefficients to zero, these methods constrain or regularize the coefficient estimates, effectively shrinking them towards zero. Ridge regression achieves this by using quadratic shrinking, while Lasso regression uses absolute-value shrinking. Other hybrid approaches, like the elastic net, combine elements of both methods.
+
+One disadvantage of ridge regression is that it includes all predictors in the final model, unlike subset selection methods which typically select a subset of variables. To overcome this drawback, the lasso regression is used as an alternative. The lasso also shrinks the coefficient estimates towards zero, and it tends to perform better.
+
+Lambda is the Tuning Parameter that controls the bias-variance tradeoff and we estimate its best value via cross-validation.
+
+```{r}
+# We look for the best value for lambda
+# We use cross validation glmnet
+glm_lasso <- cv.glmnet(X_train, as.factor(y_train),
+                      alpha = 0, family = "binomial", type.measure = "class")
+plot(glm_lasso)
+
+```
+
+
+```{r}
+# We identify th best lambda value
+best_lambda <- glm_lasso$lambda.min
+best_lambda
+```
+
+### ROC Curve
+
+We created our 3 different logistic regression model. Now, it is time to compare them on test sets to see their robustness on generalization and power on predicting satisfaction of customer.
+
+```{r}
+
+# Full model
+# Computing the predictions with the model on the test set:
+pred_glm_full<- predict(glm_full, data.frame(X_test), type = "response")
+
+# Backward elimination selection
+# Computing the predictions with the model on the test set:
+pred_glm_backward<- predict(glm_backward, data.frame(X_test), type = "response")
+
+# Lasso regresssion
+# Computing the predictions with the model on the test set:
+pred_glm_lasso<- predict(glm_lasso, X_test, type= "response", s = best_lambda)
+
+```
+
+The Receiver Operating Characteristics (ROC) curve illustrates the relationship between the True positive rate and the False positive rate across various thresholds. In an ideal scenario, the ROC curve would closely follow the top left corner. The overall effectiveness of a classifier, considering all thresholds, is quantified by the Area Under the Curve (AUC). A larger AUC value indicates a superior classifier performance.
+
+```{r roc, echo=FALSE, message=FALSE, warnings=FALSE}
+par(pty="s")
+roc(y_test,pred_glm_full,plot=TRUE, legacy.axes=TRUE, percent=TRUE, 
+    xlab="False Positive Percentage", ylab="True Positive Percentage",
+    col="blue", lwd=4,
+    print.auc=TRUE, print.auc.y=60, print.auc.x=30,
+    quiet = TRUE)
+
+plot.roc(y_test,pred_glm_backward,add=TRUE, legacy.axes=TRUE, percent=TRUE, 
+    xlab="False Positive Percentage", ylab="True Positive Percentage",
+    col="red", lwd=4,
+    print.auc=TRUE, print.auc.y=50, print.auc.x=30,
+    quiet = TRUE)
+
+plot.roc(y_test,pred_glm_lasso,add=TRUE, legacy.axes=TRUE, percent=TRUE, 
+    xlab="False Positive Percentage", ylab="True Positive Percentage",
+    col="green", lwd=4,
+    print.auc=TRUE, print.auc.y=40, print.auc.x=30,
+    quiet = TRUE)
+
+legend("bottomright",
+       legend=c("glm_full","glm_backward","glm_lasso"),
+       col=c("blue","red","green"),
+       lwd=4)
+```
+
+Ideally, we expect backward and lasso model to have better generaliation; however, in this scenario, the results yield opposite situation.
+
+### Comparison of Logistic Classifiers
+
+We have 3 different Logistic Regression models
+1- Basic Logistic Classifier : glm_full
+2- Logistic Regression with Backward Variable Selection: glm_backward
+3- Logistic Regression with Lasso Shrinkage: glm_lasso
+
+Now, it is time to make predictions and compare metric results.
+But, first we should decide best thresholds for models.
+```{r}
+# This function will return evaluation metrics
+calculate_evaluation_metrics <- function(thresholds, output_list, y_test) {
+  # Create an empty data frame to store the results
+  results_df <- data.frame(
+    Threshold = numeric(length(thresholds)),
+    Accuracy = numeric(length(thresholds)),
+    F1_Score = numeric(length(thresholds)),
+    Precision = numeric(length(thresholds)),
+    Recall = numeric(length(thresholds))
+  )
+  
+  # Calculate evaluation metrics for each threshold 
+  # Store the results in the data frame
+  for (i in 1:length(thresholds)) {
+    threshold <- thresholds[i]
+    
+    pred_output <- output_list[[as.character(threshold)]]
+    
+    results_df[i, "Threshold"] <- threshold
+    results_df[i, "Accuracy"] <- Accuracy(y_pred = pred_output, y_true = y_test)
+    results_df[i, "F1_Score"] <- F1_Score(y_pred = pred_output, y_true = y_test)
+    results_df[i, "Precision"] <- Precision(y_pred = pred_output, y_true = y_test)
+    results_df[i, "Recall"] <- Recall(y_pred = pred_output, y_true = y_test)
+  }
+  
+  # Format the floating-point numbers with two decimal places
+  results_df$Accuracy <- round(results_df$Accuracy, 4)
+  results_df$F1_Score <- round(results_df$F1_Score, 4)
+  results_df$Precision <- round(results_df$Precision, 4)
+  results_df$Recall <- round(results_df$Recall, 4)
+  
+  return(results_df)
+}
+
+```
+
+```{r}
+evaluate_on_thresholds <- function(predictions,y_test, thresholds) {
+  # Converting the prediction in {0,1} according to the chosen threshold:
+  output_list <- list()
+  
+  for (threshold in thresholds) {
+    output <- ifelse(predictions > threshold, 1, 0)
+    output_list[[as.character(threshold)]] <- output
+  }
+  
+  # Access the outputs using the threshold values as keys
+  #output_list$`0.4`
+  #output_list$`0.5`
+  #output_list$`0.6`
+  #output_list$`0.7`
+  
+  
+  # Calculate evaluation metrics
+  results <- calculate_evaluation_metrics(thresholds, output_list, y_test)
+  
+  # Print the results as a table in R Markdown
+  knitr::kable(results, align = "c")
+}
+```
+
+
+
+
+```{r}
+thresholds <- c(0.4, 0.5, 0.6, 0.7)
+evaluate_on_thresholds(pred_glm_full, y_test, thresholds)
+```
+
+```{r}
+thresholds <- c(0.4, 0.5, 0.6, 0.7)
+evaluate_on_thresholds(pred_glm_backward, y_test, thresholds)
+```
+
+```{r}
+thresholds <- c(0.4, 0.5, 0.6, 0.7)
+evaluate_on_thresholds(pred_glm_lasso, y_test, thresholds)
+```
+All 3 logistic regression models have highest F1 score with 0.6 threshold. Eventhough the expectation that backward variable selection and lasso regression model would suprass full_model, the results shows opposite. F1 score with 0.6 threshold for glm_full is higher than other models on the test set. We can conclude that generalizability of full model is higher. We may conclude that we have many samples but we do not have enough features to increase model generalizability, so decreasing number of variables or shrinking their weights do not make positive effect. We take pred_glm_full as a winner prediction from logistic regression part to further compare it with other models.
+
+## Naive Bayes
+
+The Naive Bayes Classifier is a probabilistic algorithm used for binary classification. It assumes that features are independent of each other and calculates prior probabilities and likelihoods during the training phase. The prior probabilities represent the occurrence of each class, while the likelihoods determine the probability of a feature given a class. By applying Bayes' theorem, the algorithm calculates posterior probabilities for each class and assigns the instance to the class with the highest probability.
+
+```{r}
+nb.fit <- naiveBayes(data = data.frame(X_train),
+                     y_train ~ .)
+
+# Make predictions on the test data
+pred_naive_bayes <- predict(nb.fit, newdata = X_test)
+
+# Evaluate accuracy of classifier
+mean(pred_naive_bayes == y_test)
+```
+
+BIC (Bayesian Information Criterion) is a commonly used model selection criteria that help in selecting the best model among a set of competing models. It takes into account the goodness of fit of the model and penalize the complexity of the model to avoid overfitting.
+
+BIC (Bayesian Information Criterion):
+It balances the trade-off between model fit and model complexity. 
+Formula: BIC = -2 * log-likelihood + p * log(n)
+
+* log-likelihood: The log-likelihood of the model, which measures how well the model fits the data.
+* p: The number of parameters in the model.
+* n: The sample size.
+
+BIC penalizes model complexity more heavily than the Akaike Information Criterion (AIC). The lower the BIC value, the better the model is considered to be. Therefore, when comparing models, the model with the lowest BIC is preferred.
+
+```{r}
+
+# Best Subset Selection
+
+# The regsubsets() function (part of the leaps library) 
+# performs best subset selection by identifying the best 
+# model that contains a given number of predictors, 
+# where best is quantified using bic
+
+n <- dim(X_train)[1]
+regfit.full <- regsubsets(y_train~.,data=data.frame(X_train),nvmax=n)
+reg.summary <- summary(regfit.full)
+
+# Plotting BIC 
+# BIC with its smallest value
+plot(reg.summary$bic,xlab="Number of Variables",ylab="BIC",type='l')
+min <- which.min(reg.summary$bic)
+points(10,reg.summary$bic[10],col="red",cex=2,pch=20)
+```
+Since BIC (Bayesian Information Criterion) does not change dramatically after 10th variable. We can use only 10 variables to decide satisfaction.
+
+```{r}
+# choose 10 variable model
+best_model <- coef(regfit.full, id = 10) 
+abs_coefficients <- abs(best_model)
+sorted_variables <- names(sort(abs_coefficients, decreasing = TRUE))
+column_names <- sorted_variables[-1]
+new_X_train <- X_train[, column_names, drop = FALSE]
+new_X_test <- X_test[, column_names, drop = FALSE]
+
+nb.fit <- naiveBayes(data = data.frame(new_X_train),
+                     y_train ~ .)
+
+# Make predictions on the test data
+pred_naive_bayes <- predict(nb.fit, newdata = new_X_test)
+
+# Evaluate accuracy
+mean(pred_naive_bayes == y_test)
+```
+
+The accuracy of model with 10 variables is higher. We can continue with this model.
+
+## K-Nearest Neigbors (KNN)
+
+K-Nearest Neighbors (KNN) is a supervised machine learning algorithm used for classification and regression tasks. It is a non-parametric algorithm, which means it doesn't make any assumptions about the underlying distribution of the data. KNN is a simple yet powerful algorithm that is widely used for its intuitive concept and easy implementation.
+
+The main idea behind KNN is to classify a new data point based on the majority vote of its neighbors. The algorithm assumes that similar data points tend to belong to the same class or have similar numerical values. The "K" in KNN refers to the number of nearest neighbors that are considered for classification or regression.
+
+In this model, we used K-fold cross validation. Cross-validation is a valuable technique in statistics and machine learning that helps assess the performance of a model and select optimal hyperparameters. Specifically, the K-fold cross-validation method is commonly employed for this purpose.
+
+During K-fold cross-validation, the training set is divided into K equally sized subsets or "folds." The model is then trained K times, each time using K-1 of the folds as the training data and leaving one fold as the validation set. This process is repeated K times, ensuring that each fold serves as the validation set exactly once.
+
+We can mention two benefits of k-fold cross validation. First, it allows us to leverage the entire training dataset for both training and validation. By iteratively rotating the folds, every data point gets an opportunity to be in the validation set, providing a more comprehensive evaluation of the model's performance.
+
+Secondly, K-fold cross-validation helps to mitigate the potential bias introduced by using a single validation set. When we reserve a separate validation set, there is a risk that the performance estimation becomes overly influenced by the specific data points in that set. By repeatedly shuffling and partitioning the data into different folds, we obtain a more robust estimate of the model's performance, as it is evaluated on multiple distinct subsets of the data.
+
+The final evaluation of the model is typically based on the average performance across all K iterations. This averaging process helps to reduce the variance in the performance estimate and provides a more stable measure of the model's effectiveness.
+
+We need to scale our data for two reasons. Firstly, scaling increases the speed of training process. Secondly, if we do not scale the data, the features with higher value will have more impact on predictions, however, the features should have same weight and the change only should be in range of 0-1. 
+
+```{r}
+
+# Function for feature scaling
+min_max_norm <- function(x) {
+(x - min(x)) / (max(x) - min(x))
+}
+# We normalize the columns
+train_scaled <- as.data.frame(lapply(train_data, min_max_norm))
+test_scaled<- as.data.frame(lapply(test_data, min_max_norm))
+```
+
+
+```{r knn}
+# KNN with K-fold cross validation
+
+# Define a range of K values
+k_values <- 1:10
+
+# Perform cross-validation and calculate error rates
+error_rates <- sapply(k_values, function(k) {
+  set.seed(123)  # For reproducibility
+  model <- train(as.factor(satisfaction)~., data = train_scaled, 
+                 method = "knn", 
+                 trControl = trainControl(method = "cv", number = 5),
+                 tuneGrid = data.frame(k = k))
+  1 - model$results$Accuracy
+})
+
+# Plot the Error Rates
+plot(k_values, error_rates, type = "b", pch = 16, xlab = "K Value", ylab = "Error Rate",
+     main = "KNN: Error Rate vs. K Value")
+
+
+```
+```{r}
+# find the k giving minimum error rate
+k_min <- which.min(error_rates)
+k_min
+```
+
+```{r}
+# make predictions with k = k_min 
+pred_knn<- knn(train_scaled[,-23], test_scaled[,-23],
+                cl = train_scaled$satisfaction, 
+                k = k_min)
+```
+
+
+# Classification Results
+
+## Confusion Matrix and Metrics
+```{r}
+# Create a function for confusion matrix and other metrics
+draw_confusion_matrix <- function(cm) {
+
+  layout(matrix(c(1,1,2)))
+  par(mar=c(2,2,2,2))
+  plot(c(100, 345), c(300, 450), type = "n", xlab="", ylab="", xaxt='n', yaxt='n')
+  title('CONFUSION MATRIX', cex.main=2)
+
+  # create the matrix 
+  rect(150, 430, 240, 370, col='#3F97D0')
+  text(195, 435, 'Unsatisfied', cex=1.2)
+  rect(250, 430, 340, 370, col='#F7AD50')
+  text(295, 435, 'Satisfied', cex=1.2)
+  text(125, 370, 'Predicted', cex=1.3, srt=90, font=2)
+  text(245, 450, 'Actual', cex=1.3, font=2)
+  rect(150, 305, 240, 365, col='#F7AD50')
+  rect(250, 305, 340, 365, col='#3F97D0')
+  text(140, 400, 'Unsatisfied', cex=1.2, srt=90)
+  text(140, 335, 'Satisfied', cex=1.2, srt=90)
+
+  # add in the cm results 
+  res <- as.numeric(cm$table)
+  text(195, 400, res[1], cex=1.6, font=2, col='white')
+  text(195, 335, res[2], cex=1.6, font=2, col='white')
+  text(295, 400, res[3], cex=1.6, font=2, col='white')
+  text(295, 335, res[4], cex=1.6, font=2, col='white')
+
+  # add in the specifics 
+  plot(c(100, 0), c(50, 0), type = "n", xlab="", ylab="", main = "DETAILS", xaxt='n', yaxt='n')
+  text(30, 40, names(cm$byClass[5]), cex=1.2, font=2)
+  text(30, 30, round(as.numeric(cm$byClass[5]), 3), cex=1.2)
+  text(50, 40, names(cm$byClass[7]), cex=1.2, font=2)
+  text(50, 30, round(as.numeric(cm$byClass[7]), 3), cex=1.2)
+  text(70, 40, names(cm$byClass[6]), cex=1.2, font=2)
+  text(70, 30, round(as.numeric(cm$byClass[6]), 3), cex=1.2)
+
+
+}  
+```
+
+
+```{r}
+# Confusion matrix for glm_full_model
+
+# Use best threshold for prediction (0 or 1)
+Threshold <- 0.6
+pred_glm_full_factor <- as.factor(ifelse(pred_glm_full >= Threshold , 1,0))
+
+
+conf_matrix_glm <- confusionMatrix(data = pred_glm_full_factor, 
+                                     reference = as.factor(y_test))
+draw_confusion_matrix(conf_matrix_glm)
+```
+
+```{r}
+# Confusion matrix for Naive Bayes
+conf_matrix_naive <- confusionMatrix(data = pred_naive_bayes, 
+                                     reference = as.factor(y_test))
+draw_confusion_matrix(conf_matrix_naive)
+```
+
+```{r}
+# Confusion matrix for KNN
+conf_matrix_knn <- confusionMatrix(data = pred_knn, reference = as.factor(y_test))
+draw_confusion_matrix(conf_matrix_knn)
+```
+
+In our project, we want to find unsatisfied customers as precise as possible. Because, our hypothesis is to increase total customer satisfaction with low budget. Therefore, finding unsatisfied customers and having less satisfied customer in our target will be the best method. Considering that, precision metric will be most valuable metric. Then we can count on F1 score, since it considers both Precision and Recall into account.
+
+KNN has the highest precision score rather than Naive Bayes and Logistic Regression with full features model. However, KNN is an non-parametric model and it does not have any bias related to hypothesis space. Therefore, the complexity of model increases with number of samples. Besides, we used cross-validation which also increases model complexity. We can use a validation set approach to decrease training time. 
