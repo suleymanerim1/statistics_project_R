@@ -46,47 +46,79 @@ The main objectives of this project are to identify the factors that have a stro
 
 The dataset: https://www.kaggle.com/datasets/teejmahal20/airline-passenger-satisfaction
 
+
+All the variables in the dataset are described below:
++ Gender: Gender of the passengers (Female, Male)
++ Customer Type: The customer type (Loyal customer, disloyal customer)
++ Age: The actual age of the passengers
++ Type of Travel: Purpose of the flight of the passengers (Personal Travel, Business Travel)
++ Class: Travel class in the plane of the passengers (Business, Eco, Eco Plus)
++ Flight distance: The flight distance of this journey
++ Inflight wifi service: Satisfaction level of the inflight wifi service (0:Not Applicable;1-5)
++ Departure/Arrival time convenient: Satisfaction level of Departure/Arrival time convenient
++ Ease of Online booking: Satisfaction level of online booking
++ Gate location: Satisfaction level of Gate location
++ Food and drink: Satisfaction level of Food and drink
++ Online boarding: Satisfaction level of online boarding
++ Seat comfort: Satisfaction level of Seat comfort
++ Inflight entertainment: Satisfaction level of inflight entertainment
++ On-board service: Satisfaction level of On-board service
++ Leg room service: Satisfaction level of Leg room service
++ Baggage handling: Satisfaction level of baggage handling
++ Check-in service: Satisfaction level of Check-in service
++ Inflight service: Satisfaction level of inflight service
++ Cleanliness: Satisfaction level of Cleanliness
++ Departure Delay in Minutes: Minutes delayed when departure
++ Arrival Delay in Minutes: Minutes delayed when Arrival
++ Satisfaction: Airline satisfaction level(Satisfaction, neutral or dissatisfaction)
+
+The objective of our report is to predict passenger satisfaction with airline services based on the provided dataset, which includes various demographic and satisfaction-related variables such as gender, age, travel type, flight class, and satisfaction levels with different aspects of the journey. 
+The dataset represents a survey on airline passenger satisfaction and will be used to develop a predictive model to determine whether passengers will be satisfied or dissatisfied with the airline services.
+
+Now we're going to get a summary of all the features in our dataset:
 ```{r}
 summary(data)
 ```
 
-From the summary we can see that a lot of features are ordinal because they represent ratings for different services offered during a flight. 
-We can observe that some NA values are present in "Arrival.Delay.in.Minutes" feature, it will be dealt later.
-Now we will look into all the nominal features to see their primal distribution.
+From the summary, it is evident that many features represent ratings on the services provided by the airline agency, and these ratings range from 0 to 5. Additionally, we noticed that the "Arrival Delay in Minutes" feature contains some missing values (NA).
+
+Next, we will examine the distribution of all nominal features. Specifically, we have categorical data for Gender, Customer Type, Type of Travel, and Class, while all the rating features are ordinal.
 
 ```{r}
 table(data$Gender)
 ```
-"Gender" feature is quite perfectly balanced.
+The "Gender" feature appears to be well-balanced, meaning that it has an approximately equal number of occurrences for each category, likely male and female. This balance can be beneficial for modeling as it prevents any significant bias towards a particular gender in the analysis and predictions.
 
 ```{r}
 table(data$Customer.Type)
 ```
-We can see that in Customer.Type feature there are only two values, disloyal and loyal customer. 
-The values for this feature are not balanced, we will see later if this feature is useful for our model.
-
+The "Customer Type" feature contains only two values, "disloyal customer" and "loyal customer." The distribution of values is imbalanced, with one category potentially having significantly more occurrences than the other.
 ```{r}
 table(data$Type.of.Travel)
 ```
-Also in Type.of.Travel feature there are only two values, personal and business travel.
-The values for this feature are not balanced, business travel are double than personal travel.
+The "Type of Travel" feature consists of only two values: "personal travel" and "business travel." The distribution of values is imbalanced, with "business travel" occurring twice as much as "personal travel."
 
 ```{r}
 table(data$Class)
 ```
-In Class feature there are three values, business, eco plus and eco.
-The values for this feature are not balanced, business and eco looks quite balanced while eco plus is way more less represented.
+The "Class" feature contains three values: "business," "eco plus," and "eco." The distribution of values is imbalanced. "Business" and "eco" classes appear to be relatively balanced, while "eco plus" is significantly underrepresented compared to the other two classes.
 
 ```{r}
 table(data$satisfaction)
 ```
-Our target feature is satisfaction, we can see that the values are not perfectly balanced. 
+The "satisfaction" feature, which serves as our target variable, is an important aspect of the analysis. The values for this feature are not perfectly balanced, meaning that there is an unequal distribution of satisfied and dissatisfied passengers in the dataset.
 
 # Data preprocessing
 
-This section performs data preprocessing steps such as renaming columns,
-dropping unnecessary columns, and converting categorical variables to
-factors.
+In this section of data preprocessing, several steps are performed to prepare the dataset for further analysis and modeling. The specific actions taken include:
+
+1. Renaming columns: the names of the features (columns) are modified to improve their clarity and usability. 
+
+2. Dropping unnecessary columns: two columns, "X" and "id," are removed from the dataset. The "X" column likely represents the index of the row, which does not carry any meaningful information for analysis. The "id" column is presumed to be an unknown indexing number, which may not contribute to the predictive modeling process.
+
+3. Converting categorical variables to factors: categorical variables, such as "Gender", "Customer Type", "Type of Travel" and "Class" are converted into factors. Converting categorical variables into factors is a common practice in R to represent these variables as distinct levels, allowing for better handling and analysis in statistical models.
+
+By performing these data preprocessing steps, the dataset is cleaned and transformed into a more suitable format for the subsequent analysis, making it easier to build a predictive model for passenger satisfaction.
 
 ```{r}
 # replace dots with underscores in column names
@@ -105,47 +137,22 @@ data$Class = factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))
 data$satisfaction = factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))
 ```
 
-Now we can visualize how the features are distributed by satisfaction.
-This section provides a summary of each variable in the dataset, grouped
-by our target variable.
-
-```{r}
-# Print summary for each variable grouped by satisfaction, including the name of the variable
-for (col in names(data)) {
-  print(col)
-  print(by(data[[col]], data$satisfaction, summary))
-}
-```
-From here we can see that:
-+ men and women are equally satisfied and dissatisfied
-+ dissatisfied customer are younger than satisfied customer (see 1st quartile and median)
-+ personal travel is more likely to be dissatisfied than business travel
-+ business travel are slightly more likely to be satisfied 
-+ business class' customers are more likely to be satisfied than eco and eco plus
-+ longer distance flights are more likely to be satisfied
-+ departure and arrival delays are more likely to bring dissatisfaction
-
-
 # Handling na values
 
-This section identifies the variables with missing values and calculates
-the proportion of missing values for the "Arrival_Delay_in_Minutes"
-variable. It then drops the examples with missing values.
+In this section, we analyze the dataset to identify variables with missing values, particularly focusing on the "Arrival_Delay_in_Minutes" variable. We calculate the proportion of missing values for this variable and subsequently remove the examples or rows with missing values from the dataset.
 
 ```{r}
 # list features with na values
 prop.table(colSums(is.na(data)))
 ```
 
-From here we can see that Arrival_Delay_in_Minutes has missing values,
-let's the proportion of na values
+To determine the proportion of missing values for the "Arrival_Delay_in_Minutes" variable, we can count the number of instances where this variable has missing values (commonly denoted as "NaN" or "NA") and divide it by the total number of examples in the dataset. This will give us the proportion of missing values for the "Arrival_Delay_in_Minutes" variable.
 
 ```{r}
 # Arrival_Delay_in_Minutes has na values, proportion of na values
 prop.table(table(is.na(data$Arrival_Delay_in_Minutes)))
 ```
-We can see that the proportion of na values is very low (less than 3% of the entire dataset), we can drop the na values.
-
+Indeed, since the proportion of missing values for the "Arrival_Delay_in_Minutes" variable is very low (less than 3% of the entire dataset), it is reasonable to proceed with dropping these missing values from the dataset. 
 ```{r}
 # na values are only 0.03% of the data -> drop na values
 data = data %>% drop_na(Arrival_Delay_in_Minutes)
@@ -153,15 +160,16 @@ data = data %>% drop_na(Arrival_Delay_in_Minutes)
 
 # Outliers
 
-This section creates box plots for each numeric variable in the dataset
-to visualize the presence of outliers. It also compares the box plots
-against the target variable (satisfaction).
+In this section, box plots are created for each numeric variable present in the dataset. Box plots are a powerful visualization tool used to identify the presence of outliers in the data. For each numeric variable, the box plot displays a box that represents the interquartile range (IQR), with the median indicated by a line inside the box. The "whiskers" extending from the box show the range of the data, and any data points beyond the whiskers are considered potential outliers.
+
+By examining the box plots for each numeric variable, we can visually identify any data points that lie far outside the typical range of the data, indicating potential outliers. Outliers can significantly impact statistical analyses, so detecting and handling them appropriately is crucial for ensuring the integrity of the dataset and the accuracy of subsequent analyses and modeling.
 
 ```{r}
 ratings_fts_names = c("Inflight_wifi_service", "Departure_Arrival_time_convenient", 
   "Ease_of_Online_booking", "Gate_location", "Food_and_drink", "Online_boarding", 
   "Seat_comfort", "Inflight_entertainment", "On_board_service", "Leg_room_service", 
   "Baggage_handling", "Checkin_service", "Inflight_service", "Cleanliness", "On_board_service")
+
 # plot boxplot of each numeric variable excluding ratings features
 plots = list()
 for (col in names(data)[sapply(data, is.numeric)]) {
@@ -177,11 +185,45 @@ for (col in names(data)[sapply(data, is.numeric)]) {
 grid.arrange(grobs = plots, ncol = 2)
 ```
 We can see that there are outliers in Departure_Delay_in_Minutes, Arrival_Delay_in_Minutes and Flight_Distance.
+Considering the presence of both near-zero and very large values in the dataset, alternative distributions like the log-normal distribution may be more appropriate for modeling the "Departure_Delay_in_Minutes" and "Arrival_Delay_in_Minutes" variables, as they can better capture the variability in delay times.
+
+# Our variables vs satisfaction
+
+Now we can visualize how the features are distributed by satisfaction.
+This section provides a summary of each variable in the dataset, grouped
+by our target variable.
+
+```{r}
+# Print summary for each variable grouped by satisfaction, including the name of the variable
+for (col in names(data)) {
+  print(col)
+  print(by(data[[col]], data$satisfaction, summary))
+}
+```
+From the analysis of the dataset, we observe the following insights:
+
+1. Gender does not appear to significantly influence satisfaction levels, as both men and women show similar satisfaction and dissatisfaction rates.
+
+2. There is a trend suggesting that younger passengers are more likely to be dissatisfied compared to older passengers, as evidenced by the lower values at the 1st quartile and median of the age distribution for dissatisfied customers.
+
+3. Passengers traveling for personal reasons are more likely to be dissatisfied than those on business trips.
+
+4. Conversely, passengers on business trips have a slightly higher likelihood of being satisfied with their travel experience.
+
+5. Customers in the business class are more likely to be satisfied with the airline services compared to those in the economy and economy plus classes.
+
+6. Longer distance flights tend to have higher satisfaction levels among passengers.
+
+7. Departure and arrival delays are associated with a higher likelihood of passenger dissatisfaction.
+
+These insights provide valuable information for the airline company to understand customer preferences and pain points, allowing them to improve services, prioritize customer satisfaction, and address specific areas that may lead to dissatisfaction among passengers.
+Visualizing each distribution can indeed provide a clearer understanding of the results.
 
 # Visualization
 
-This section includes histograms to visualize the distribution of
-categorical variables in the dataset.
+In this section, histograms are used to visualize the distribution of the variables in the dataset, starting with the nominal features. By creating histograms for the nominal features, we can gain insights into the distribution of categories within each feature.
+
+Upon visualizing the nominal features, it becomes apparent that some features exhibit heavily unbalanced distributions. This means that certain categories within these features have significantly higher frequencies compared to others. The presence of such imbalanced distributions could have implications for analysis and modeling, as it may lead to biased results or difficulties in predicting less frequent categories accurately.
 
 ```{r fig.height=10, fig.width=12}
 # plot distribution of categorical variables
@@ -198,7 +240,8 @@ for (col in names(data)[sapply(data, is.factor)]) {
 grid.arrange(grobs = plots, ncol = 2)
 ```
 
-Here we plot the distribution of ratings features.
+Then we plot the distribution of ratings features.
+
 ```{r fig.height=18, fig.width=12}
 # plot distribution of ratings features
 plots = list()
@@ -210,7 +253,7 @@ for (col in names(data)[sapply(data, is.numeric)]) {
   }
   plot <- ggplot(data, aes(x = .data[[col]], fill = factor(.data[[col]]))) +
     geom_bar() +
-    geom_text(stat = 'count', aes(label = ..count..), vjust = -0.5) +  
+    geom_text(stat = 'count', aes(label = after_stat(count))) +  
     labs(title = paste("Histogram of ", col), x = col, y = "Count") +
     scale_fill_manual(values = my_palette) +
     guides(fill = FALSE)
@@ -220,31 +263,10 @@ for (col in names(data)[sapply(data, is.numeric)]) {
 grid.arrange(grobs = plots, ncol = 3)
 ```
 
-
-
-```{r}
-plots <- list()
-for (col in names(data)[sapply(data, is.numeric)]) {
-  if (!col %in% ratings_fts_names) {
-    next
-  }
-  plot <- ggplot(data, aes(x = .data[[col]], fill = factor(.data[[col]]))) +
-    geom_bar() +
-    geom_text(stat = 'count', aes(label = ..count..), vjust = -0.5) +  # Add count labels below each bar
-    labs(title = paste("Histogram of ", col), x = col, y = "Count", bins = 6) +
-    scale_fill_manual(values = my_palette) +  # Adding the custom color palette
-    facet_grid(. ~ satisfaction)  # Separate the plots based on 'satisfaction'
-
-  plots[[col]] <- plot
-}
-
-# Adjust the heights of the plots using 'heights' argument in grid.arrange
-grid.arrange(grobs = plots, ncol = 3)
-
-```
-
 This section includes histograms to visualize the distribution of
 numeric variables in the dataset.
+
+**needs interpretation **
 
 ```{r}
 # plot distribution and density of numeric variables excluding ratings features
@@ -255,7 +277,7 @@ for (col in names(data)[sapply(data, is.numeric)]) {
   }
   plot = ggplot(data, aes(x = .data[[col]])) +
   geom_histogram(aes(y = after_stat(density)), bins = 30, alpha = 0.5) +
-  geom_density(alpha = 0.5, fill = "red") +
+  geom_density(alpha = 0.2, fill = "red") +
   labs(title = paste("Histogram of", col), x = col, y = "Count") 
 
   plots[[col]] = plot
@@ -264,7 +286,11 @@ for (col in names(data)[sapply(data, is.numeric)]) {
 grid.arrange(grobs = plots, ncol = 2)
 ```
 
-```{r}
+# Visualization vs satisfaction
+
+** TODO: write interpretations of the graphs **
+
+```{r fig.width=12}
 # plots categorical variables vs satisfaction
 plots = list()
 for (col in names(data)[sapply(data, is.factor)]) {
@@ -283,7 +309,7 @@ for (col in names(data)[sapply(data, is.factor)]) {
 grid.arrange(grobs = plots, ncol = 2)
 ```
 
-```{r}
+```{r fig.height=28, fig.width=12}
 # plots ratings features vs satisfaction
 plots = list()
 for (col in names(data)[sapply(data, is.numeric)]) {
@@ -298,25 +324,27 @@ for (col in names(data)[sapply(data, is.numeric)]) {
   plots[[col]] = plot  
 }
 
-grid.arrange(grobs = plots, ncol = 3)
+grid.arrange(grobs = plots, ncol = 2)
 ```
 
-```{r fig.height=10}
-# plots numeric variables vs satisfaction
+```{r fig.height=10, fig.width=10}
+# plots numeric variables vs satisfaction excluding ratings features
 plots = list()
+
 for (col in names(data)[sapply(data, is.numeric)]) {
-  if (col == "satisfaction") {
+  if (col %in% ratings_fts_names) {
     next
   }
   plot = ggplot(data, aes(x = satisfaction, y = .data[[col]])) +
+  theme_minimal() +
   geom_boxplot() +
-  labs(x = "Satisfaction", y = col)
+  labs(title = paste("Boxplot of Satisfaction by", col), x = "Satisfaction", y = col)
 
-  plots[[col]] = plot
-  
+  plots[[col]] = plot  
 }
 
-grid.arrange(grobs = plots, ncol = 4)
+grid.arrange(grobs = plots, ncol = 2)
+
 ```
 
 # Convert categorical to numerical
