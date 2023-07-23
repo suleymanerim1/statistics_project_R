@@ -26,6 +26,8 @@ library(gridExtra)
 library(correlation)
 library(reshape)
 library(reshape2)
+library(corrr)
+library(viridis)
 ```
 
 
@@ -465,111 +467,23 @@ test = test %>% select(-satisfaction)
 prop.table(table(train$satisfaction))
 prop.table(table(test_true))
 ```
-
-# Correlation matrix
-
-This section calculates the correlation matrix for numeric variables and
-plots a heatmap to visualize the correlations between variables.
-
-```{r fig.height=12, fig.width=12}
-# correlation matrix only for numeric variables
-correlation_matrix = cor(data[, sapply(data, is.numeric)])
-
-# Plot a heatmap of the correlation matrix
-ggplot(data = reshape2::melt(correlation_matrix)) +
-  geom_tile(aes(x = Var1, y = Var2, fill = value)) +
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
-                       midpoint = 0, limit = c(-1,1), space = "Lab",
-                       name="Correlation") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                    size = 10, hjust = 1)) +
-  coord_fixed()
-
-par(mfrow = c(1, 1))
-```
-
 ```{r}
-# Find high correlated features with satisfaction
-# TODO: do the same with different threshold to find differences
-# NOTE: i decided to use 0.3 as threshold
-satisfaction_corr <- correlation_matrix['satisfaction',]
-high_corr_satis <- names(satisfaction_corr[abs(satisfaction_corr) > 0.3 | abs(satisfaction_corr) < -0.3])
-high_corr_satis <- high_corr_satis[high_corr_satis != "satisfaction"]
-high_corr_satis
-```
+## Correlation matrix for numerical features
 
-```{r}
-# Compute the correlations between the high correlation features and satisfaction
-correlations <- data.frame(
-  feature = high_corr_satis,
-  correlation = sapply(high_corr_satis, function(x) cor(data[,x], data$satisfaction))
-)
-correlations
-```
+ds_cor1 <- cor(subset(data,select = c(Age, Flight_Distance,Departure_Delay_in_Minutes,Arrival_Delay_in_Minutes)))
+summary(ds_cor1)
+options(repr.plot.width = 14, repr.plot.height = 8)
+corrplot(ds_cor1, na.label = " ", method="color", tl.col = "black", tl.cex = 1)
 
-```{r}
-# plot the correlations
-ggplot(correlations, aes(x = reorder(feature, correlation), y = correlation)) +
-  geom_bar(stat = "identity", fill = "blue", alpha = 0.4) +
-  ggtitle("Correlation between features and satisfaction") +
-  xlab('Features') +
-  ylab('Correlation')
 
-par(mfrow = c(1, 1))
-```
+## Correlation matrix for ordinal features
 
-```{r}
-#save on cvs
-# write.csv(correlations, file = "correlations.csv")
-```
-
-# Correlation with different ratings
-
-```{r fig.height=8, fig.width=8}
-# compute correlation matrix with only ratings features
-ratings_data = data[, c(ratings_fts_names)]
-ratings_data <- apply(ratings_data, 2, as.numeric)
-
-# correlation matrix only for ratings features
-ratings_correlation_matrix = cor(ratings_data)
-
-# Plot a heatmap of the correlation matrix
-ggplot(data = reshape2::melt(ratings_correlation_matrix)) +
-  geom_tile(aes(x = Var1, y = Var2, fill = value)) +
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
-                       midpoint = 0, limit = c(-1,1), space = "Lab",
-                       name="Correlation") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                    size = 10, hjust = 1)) +
-  coord_fixed()
-
-par(mfrow = c(1, 1))
+ds_cor2 <- cor(subset(data, select = c(Inflight_wifi_service, Departure_Arrival_time_convenient, Ease_of_Online_booking, Gate_location, Food_and_drink, Online_boarding, Seat_comfort, Inflight_entertainment, On_board_service, Leg_room_service, Baggage_handling, Checkin_service, Inflight_service,Cleanliness)))
+summary(ds_cor2)
+options(repr.plot.width = 14, repr.plot.height = 8)
+corrplot(ds_cor2, na.label=" ", tl.cex=1, tl.col="black", method="color")
 
 ```
-```{r}
-# Assuming you have already calculated the 'ratings_correlation_matrix' using the code you provided.
-
-# Convert the correlation matrix to a data frame to work with it easily
-ratings_correlation_df <- as.data.frame(as.table(ratings_correlation_matrix))
-
-# Rename the columns in the data frame
-colnames(ratings_correlation_df) <- c("Var1", "Var2", "Correlation")
-
-# Sort the data frame by the absolute correlation values in descending order
-sorted_correlation_df <- ratings_correlation_df[order(-abs(ratings_correlation_df$Correlation)), ]
-
-# Filter out the self-correlations (correlation of a variable with itself)
-sorted_correlation_df <- sorted_correlation_df[sorted_correlation_df$Var1 != sorted_correlation_df$Var2, ]
-
-# Print the top N most correlated features
-N <- 15  # Change N to get more or fewer correlated features
-top_correlated_features <- head(sorted_correlation_df, N)
-
-print(top_correlated_features)
-
-```
-
-
 # Relation between Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes (linear)
 
 This section explores the partial correlation matrix and identifies
@@ -587,23 +501,39 @@ variables with high correlations with the target variable
 #we set a treshold of 0
 
 
-#correlation(train, partial=TRUE, method='pearson')
+
 #save the partial correlation matrix result in a dataframe and output a file for further analysis
 
-
-#partial_corr <- correlation(train, partial=TRUE, method='pearson')
+# do the partial correlation only for numerical variables
+#partial_corr = correlation(data[,sapply(data, is.numeric)], partial=TRUE, method = "spearman", use = "pairwise.complete.obs", verbose = TRUE)
 #write.csv(partial_corr, file = "partial_corr.csv")
 
 partial_correlations = read.csv("partial_corr.csv", header = TRUE, sep = ",")
 
+
+head(partial_correlations)
 #make the first column the row names
+
 rownames(partial_correlations) = partial_correlations[,1]
 
-#drop the first  (X) column
+# delete the first column
 partial_correlations = partial_correlations[,-1]
 
-# Create a new matrix with rounded partial correlations
-partial_correlations_rounded <- round(partial_correlations, digits = 3)
+#round the values
+partial_correlations_rounded = round(partial_correlations, digits = 3)
+
+# Remove the first column (variable names) to keep only numeric values
+correlation_matrix_numeric <- partial_correlations[, -1]
+
+# Convert the data to a matrix
+correlation_matrix_matrix <- as.matrix(partial_correlations)
+correlation_matrix_matrix
+
+options(repr.plot.width = 14, repr.plot.height = 8)
+corrplot(correlation_matrix_matrix, na.label = " ", method="color", tl.col = "black", tl.cex = 1)
+
+
+
 
 
 # Initialize empty data frame with 0 rows
