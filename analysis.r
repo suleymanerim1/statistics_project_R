@@ -30,10 +30,6 @@ data$Type_of_Travel = factor(data$Type_of_Travel, levels = c("Personal Travel", 
 data$Class = factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))
 data$satisfaction = factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))
 
-# creating data for chi-square test of independence.
-data_chi_test = data
-
-
 ######################################################
 
 #   HANDLING NA VALUES
@@ -240,27 +236,20 @@ prop.table(table(test_true))
 
 ## CORRELATION MATRIX FOR NUMERICAL VARIABLES
 
-ds_cor1 <- cor(subset(data,select = c(Age, Flight_Distance,Departure_Delay_in_Minutes,Arrival_Delay_in_Minutes, satisfaction)))
+ds_cor1 <- cor(subset(data,select = c(Age, Flight_Distance,Departure_Delay_in_Minutes,Arrival_Delay_in_Minutes)))
 summary(ds_cor1)
 options(repr.plot.width = 14, repr.plot.height = 8)
 corrplot(ds_cor1, na.label = " ", method="color", tl.col = "black", tl.cex = 1)
 
 
-
-
 ## CORRELATION MATRIX FOR ORDINAL VARIABLES
 
-ds_cor2 <- cor(subset(data, select = c(Inflight_wifi_service, Departure_Arrival_time_convenient, Ease_of_Online_booking, Gate_location, Food_and_drink, Online_boarding, Seat_comfort, Inflight_entertainment, On_board_service, Leg_room_service, Baggage_handling, Checkin_service, Inflight_service,Cleanliness, satisfaction)))
+ds_cor2 <- cor(subset(data, select = c(Inflight_wifi_service, Departure_Arrival_time_convenient, Ease_of_Online_booking, Gate_location, Food_and_drink, Online_boarding, Seat_comfort, Inflight_entertainment, On_board_service, Leg_room_service, Baggage_handling, Checkin_service, Inflight_service,Cleanliness)))
 summary(ds_cor2)
 options(repr.plot.width = 14, repr.plot.height = 8)
 corrplot(ds_cor2, na.label=" ", tl.cex=1, tl.col="black", method="color")
 
-## CORRELATION MATRIX FOR CATEGORICAL VARIABLES
 
-ds_cor3 = cor(subset(data, select = c(Gender, Class, Type_of_Travel, Customer_Type, satisfaction))) 
-summary(ds_cor3)
-options(repr.plot.width = 14, repr.plot.height = 8)
-corrplot(ds_cor3, na.label=" ", tl.cex=1, tl.col="black", method="color")
 
 
 
