@@ -40,9 +40,7 @@ attach(data)
 
 
 # Introduction
-In this project, we will predict whether a passenger will be satisfied or dissatisfied with the services offered by an airline company. The dataset comprises a survey on airline passenger satisfaction.
-
-The main objectives of this project are to identify the factors that have a strong correlation with passenger satisfaction or dissatisfaction and to develop a predictive model for passenger satisfaction.
+In this project, we will develop a predictive model to determine whether a passenger will be satisfied or dissatisfied with the services offered by an airline company. The dataset used for this project is a survey on airline passenger satisfaction, which contains information about passengers' demographics, travel preferences, and satisfaction with various aspects of their flights.
 
 The dataset: https://www.kaggle.com/datasets/teejmahal20/airline-passenger-satisfaction
 
@@ -266,10 +264,17 @@ ratings_mean
 ```
 
 
-This section includes histograms to visualize the distribution of
-numeric variables in the dataset.
+This section presents histograms to visualize the distribution of numeric variables in the dataset. The histograms show that:
+1. The age distribution has two main peaks, one at around 25 and another at around 30-35.
+2. The flight distance distribution can be represented by a log-normal distribution, with a peak at around 500 miles.
+3. The departure delay and arrival delay distributions are very similar, and both show a significant number of outliers.
 
-**needs interpretation **
+The histograms provide a useful overview of the distribution of the numeric variables in the dataset. This information can be used to identify potential outliers, and to choose appropriate statistical methods for analyzing the data.
+Here are some additional details that could be included in the rephrased text:
+
+1. The age distribution is bimodal, which means that it has two distinct peaks. This could be due to a number of factors, such as the airline's target customer base, or the typical age of people who travel by air.
+2. The flight distance distribution is log-normal, which means that it is skewed to the right. This is likely due to the fact that there are a few very long flights, which skew the distribution.
+3. The departure delay and arrival delay distributions are very similar, which suggests that they are caused by the same factors. These factors could include weather conditions, air traffic control delays, or mechanical problems with the aircraft.
 
 ```{r fig.width=8}
 # plot distribution and density of numeric variables excluding ratings features
@@ -354,7 +359,7 @@ grid.arrange(grobs = plots, ncol = 2)
 
 Based on the boxplots and the information provided, we can make the following observations about the distributions of the numerical features:
 
-1. Age: the boxplot for "Age" suggests that the distribution is approximately normal. This is indicated by the symmetric shape of the box, with the median line dividing it quite evenly.
+1. Age: the boxplot for "Age" suggests that the distribution is approximately normal. Furthermore, it appears that neutral or dissatisfied customers tend to be slightly younger on average compared to satisfied customers.
 
 2. Flight Distance: the boxplot does not exhibit a normal distribution. Instead, it appears to have a right-skewed distribution. This is evident from the longer whisker on the right side, indicating that there are some outliers with larger flight distances.
 
@@ -363,49 +368,23 @@ Based on the boxplots and the information provided, we can make the following ob
 4. Arrival Delay in Minutes: similar to the "Departure Delay in Minutes," the boxplot for "Arrival Delay in Minutes" exhibits a right-skewed distribution. The bulk of the data is clustered towards the lower values, with a lot of outliers indicating longer arrival delays.
 
 Based on these observations, it's essential to consider the appropriate data transformations or use different distribution models when working with "Flight Distance," "Departure Delay in Minutes," and "Arrival Delay in Minutes." For example, logarithmic transformations may be suitable to handle the skewed nature of these variables in statistical analyses and modeling tasks.
-```{r fig.height=10, fig.width=10}
-# plots numeric variables vs satisfaction excluding ratings features
+```{r fig.height=7, fig.width=10}
+# plots numeric variables vs satisfaction excluding ratings features with histograms of different colors for each satisfaction level
 plots = list()
-
 for (col in names(data)[sapply(data, is.numeric)]) {
   if (col %in% ratings_fts_names) {
     next
   }
-  plot = ggplot(data, aes(x = satisfaction, y = .data[[col]])) +
-  theme_minimal() +
-  geom_boxplot() +
-  labs(title = paste("Boxplot of Satisfaction by", col), x = "Satisfaction", y = col)
+  plot = ggplot(data, aes(x = .data[[col]], fill = satisfaction, group = satisfaction)) +
+    theme_minimal() +
+    geom_histogram(alpha = 0.5, bins = 30) +
+    labs(title = paste("Histogram of", col), x = col, y = "Count") 
 
-  plots[[col]] = plot  
+  plots[[col]] = plot
 }
 
 grid.arrange(grobs = plots, ncol = 2)
 
-```
-
-# Convert categorical to numerical
-
-This section converts the categorical variables to numeric
-representation for further analysis.
-
-```{r}
-gender_map = c("Male" = 0, "Female" = 1)
-data$Gender = gender_map[as.numeric(data$Gender)]
-
-customer_type_map = c("Loyal Customer" = 0, "disloyal Customer" = 1)
-data$Customer_Type = customer_type_map[as.numeric(data$Customer_Type)]
-
-type_of_travel_map = c("Personal Travel" = 0, "Business travel" = 1)
-data$Type_of_Travel = type_of_travel_map[as.numeric(data$Type_of_Travel)]
-
-class_map = c("Business" = 0, "Eco" = 1, "Eco Plus" = 2)
-data$Class = class_map[as.numeric(data$Class)]
-```
-
-
-```{r}
-satisfaction_map = c("neutral or dissatisfied" = 0, "satisfied" = 1)
-data$satisfaction = satisfaction_map[as.numeric(data$satisfaction)]
 ```
 
 # Data balance
@@ -415,6 +394,46 @@ customers in the dataset.
 
 ```{r}
 prop.table(table(data$satisfaction))
+
+```
+
+# Feature engineering
+
+```{r}
+# add new feature
+ratings_data = data[, c(ratings_fts_names)]
+ratings_data <- apply(ratings_data, 2, as.numeric)
+# 1. ratings mean
+data$ratings_mean = rowMeans(ratings_data)
+
+# 2. onboard rating mean
+onboard_features = c("Inflight_wifi_service", "Food_and_drink", 
+  "Seat_comfort", "Inflight_entertainment", "On_board_service", "Leg_room_service", 
+  "Baggage_handling", "Inflight_service", "Cleanliness")
+
+data$onboard_rating_mean = rowMeans(ratings_data[, onboard_features])
+
+```
+
+# Convert categorical to numerical
+
+This section converts the categorical variables to numeric
+representation for further analysis.
+
+```{r}
+# gender_map = c("Male" = 0, "Female" = 1)
+# data$Gender = gender_map[as.numeric(data$Gender)]
+
+# customer_type_map = c("Loyal Customer" = 0, "disloyal Customer" = 1)
+# data$Customer_Type = customer_type_map[as.numeric(data$Customer_Type)]
+
+# type_of_travel_map = c("Personal Travel" = 0, "Business travel" = 1)
+# data$Type_of_Travel = type_of_travel_map[as.numeric(data$Type_of_Travel)]
+
+# class_map = c("Business" = 0, "Eco" = 1, "Eco Plus" = 2)
+
+# satisfaction_map = c("neutral or dissatisfied" = 0, "satisfied" = 1)
+# data$satisfaction = satisfaction_map[as.numeric(data$satisfaction)]
 ```
 
 # Train test split

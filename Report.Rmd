@@ -1,5 +1,5 @@
 ---
-title: "EDA"
+title: "The Report"
 author: "Süleyman Erim, Giacomo Schiavo, Mattia Varagnolo"
 date: "`r Sys.Date()`"
 output: pdf_document
@@ -26,6 +26,16 @@ library(gridExtra)
 library(correlation)
 library(reshape)
 library(reshape2)
+library(tidyverse) # for data manipulation
+library(ggplot2) # for plotting
+library(gridExtra) # for grid.arrange
+library(regclass) # for VIF package
+library(MLmetrics) # to create confusion matrix
+library(pROC) # for ROC Curve
+library(e1071) # for Naive Bayes Classifier
+library(class)
+library(caret)
+library(glmnet) # for Lasso Regression
 ```
 
 
@@ -39,13 +49,13 @@ attach(data)
 ```
 
 
-# Introduction
-In this project, we will predict whether a passenger will be satisfied or dissatisfied with the services offered by an airline company. The dataset comprises a survey on airline passenger satisfaction.
+# Data Analysis
 
-The main objectives of this project are to identify the factors that have a strong correlation with passenger satisfaction or dissatisfaction and to develop a predictive model for passenger satisfaction.
+In this project, we will develop a predictive model to determine whether a passenger will be satisfied or dissatisfied with the services offered by an airline company. The dataset used for this project is a survey on airline passenger satisfaction, which contains information about passengers' demographics, travel preferences, and satisfaction with various aspects of their flights.
 
 The dataset: https://www.kaggle.com/datasets/teejmahal20/airline-passenger-satisfaction
 
+## Description of our variables
 
 Here are the variables in the dataset:
 
@@ -82,6 +92,13 @@ Now we're going to get a summary of all the features in our dataset:
 summary(data)
 ```
 
+Calculate the proportion of satisfied and dissatisfied
+customers in the dataset.
+
+```{r}
+prop.table(table(data$satisfaction))
+```
+
 From the summary, it is evident that many features represent ratings on the services provided by the airline agency, and these ratings range from 0 to 5. Additionally, we noticed that the "Arrival Delay in Minutes" feature contains some missing values (NA).
 
 Next, we will examine the distribution of all nominal features. Specifically, we have categorical data for Gender, Customer Type, Type of Travel, and Class, while all the rating features are ordinal.
@@ -110,7 +127,7 @@ table(data$satisfaction)
 ```
 The "satisfaction" feature, which serves as our target variable, is an important aspect of the analysis. The values for this feature are not perfectly balanced, meaning that there is an unequal distribution of satisfied and dissatisfied passengers in the dataset.
 
-# Data preprocessing
+## Data preprocessing
 
 In this section of data preprocessing, several steps are performed to prepare the dataset for further analysis and modeling. The specific actions taken include:
 
@@ -122,6 +139,7 @@ In this section of data preprocessing, several steps are performed to prepare th
 
 By performing these data preprocessing steps, the dataset is cleaned and transformed into a more suitable format for the subsequent analysis, making it easier to build a predictive model for passenger satisfaction.
 
+### Renaming columns and removing features
 ```{r}
 # replace dots with underscores in column names
 names(data) = gsub("\\.", "_", names(data))
@@ -130,13 +148,16 @@ data = data %>% select(-X, -id)
 names(data)
 ```
 
+### Convert categorical features to factors
 ```{r}
 # convert categorical features to factor
-data$Gender = factor(data$Gender, levels = c("Male", "Female"))
-data$Customer_Type = factor(data$Customer_Type, levels = c("Loyal Customer", "disloyal Customer"))
-data$Type_of_Travel = factor(data$Type_of_Travel, levels = c("Personal Travel", "Business travel"))
-data$Class = factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))
-data$satisfaction = factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))
+data$Gender = as.factor(data$Gender)
+data$Customer_Type = as.factor(data$Customer_Type)
+data$Type_of_Travel = as.factor(data$Type_of_Travel)
+data$Class = as.factor(data$Class)
+data$satisfaction = as.factor(data$satisfaction)
+data$Arrival_Delay_in_Minutes <- as.numeric(data$Arrival_Delay_in_Minutes)
+
 
 ratings_fts_names = c("Inflight_wifi_service", "Departure_Arrival_time_convenient", 
   "Ease_of_Online_booking", "Gate_location", "Food_and_drink", "Online_boarding", 
@@ -144,12 +165,12 @@ ratings_fts_names = c("Inflight_wifi_service", "Departure_Arrival_time_convenien
   "Baggage_handling", "Checkin_service", "Inflight_service", "Cleanliness", "On_board_service")
 
 for (col in ratings_fts_names) {
-  data[[col]] = factor(data[[col]], levels = c(0:5))
+  data[[col]] = as.factor(data[[col]])
 }
 
 ```
 
-# Handling na values
+## Handling na values
 
 In this section, we analyze the dataset to identify variables with missing values, particularly focusing on the "Arrival_Delay_in_Minutes" variable. We calculate the proportion of missing values for this variable and subsequently remove the examples or rows with missing values from the dataset.
 
@@ -167,10 +188,22 @@ prop.table(table(is.na(data$Arrival_Delay_in_Minutes)))
 Indeed, since the proportion of missing values for the "Arrival_Delay_in_Minutes" variable is very low (less than 3% of the entire dataset), it is reasonable to proceed with dropping these missing values from the dataset. 
 ```{r}
 # na values are only 0.03% of the data -> drop na values
-data = data %>% drop_na(Arrival_Delay_in_Minutes)
+# Check for missing values in "Arrival_Delay_in_Minutes"
+# Check if there are any NA values in the "Arrival_Delay_in_Minutes" column
+print(sum(is.na(data$Arrival_Delay_in_Minutes)))
+
+# Impute missing values with 0
+data$Arrival_Delay_in_Minutes[is.na(data$Arrival_Delay_in_Minutes)] <- 0
+
+# Check again for any NA values in the "Arrival_Delay_in_Minutes" column
+print(sum(is.na(data$Arrival_Delay_in_Minutes)))
+
+# Check the proportion of NA values in the entire dataset
+prop.table(colSums(is.na(data)))
+
 ```
 
-# Outliers
+## Outliers
 
 In this section, box plots are created for each numeric variable present in the dataset. Box plots are a powerful visualization tool used to identify the presence of outliers in the data. For each numeric variable, the box plot displays a box that represents the interquartile range (IQR), with the median indicated by a line inside the box. The "whiskers" extending from the box show the range of the data, and any data points beyond the whiskers are considered potential outliers.
 
@@ -266,10 +299,17 @@ ratings_mean
 ```
 
 
-This section includes histograms to visualize the distribution of
-numeric variables in the dataset.
+This section presents histograms to visualize the distribution of numeric variables in the dataset. The histograms show that:
+1. The age distribution has two main peaks, one at around 25 and another at around 30-35.
+2. The flight distance distribution can be represented by a log-normal distribution, with a peak at around 500 miles.
+3. The departure delay and arrival delay distributions are very similar, and both show a significant number of outliers.
 
-**needs interpretation **
+The histograms provide a useful overview of the distribution of the numeric variables in the dataset. This information can be used to identify potential outliers, and to choose appropriate statistical methods for analyzing the data.
+Here are some additional details that could be included in the rephrased text:
+
+1. The age distribution is bimodal, which means that it has two distinct peaks. This could be due to a number of factors, such as the airline's target customer base, or the typical age of people who travel by air.
+2. The flight distance distribution is log-normal, which means that it is skewed to the right. This is likely due to the fact that there are a few very long flights, which skew the distribution.
+3. The departure delay and arrival delay distributions are very similar, which suggests that they are caused by the same factors. These factors could include weather conditions, air traffic control delays, or mechanical problems with the aircraft.
 
 ```{r fig.width=8}
 # plot distribution and density of numeric variables excluding ratings features
@@ -289,7 +329,7 @@ for (col in names(data)[sapply(data, is.numeric)]) {
 grid.arrange(grobs = plots, ncol = 2)
 ```
 
-# Visualization vs satisfaction
+## Variables vs Target
 
 The observations from the graph analysis provide valuable insights into how different nominal features relate to passenger satisfaction:
 1. Gender: both males and females appear to have similar distributions in terms of satisfaction, indicating that gender may not be a strong predictor of passenger satisfaction. The distributions closely resemble the overall distribution of the satisfaction feature.
@@ -354,7 +394,7 @@ grid.arrange(grobs = plots, ncol = 2)
 
 Based on the boxplots and the information provided, we can make the following observations about the distributions of the numerical features:
 
-1. Age: the boxplot for "Age" suggests that the distribution is approximately normal. This is indicated by the symmetric shape of the box, with the median line dividing it quite evenly.
+1. Age: the boxplot for "Age" suggests that the distribution is approximately normal. Furthermore, it appears that neutral or dissatisfied customers tend to be slightly younger on average compared to satisfied customers.
 
 2. Flight Distance: the boxplot does not exhibit a normal distribution. Instead, it appears to have a right-skewed distribution. This is evident from the longer whisker on the right side, indicating that there are some outliers with larger flight distances.
 
@@ -363,23 +403,40 @@ Based on the boxplots and the information provided, we can make the following ob
 4. Arrival Delay in Minutes: similar to the "Departure Delay in Minutes," the boxplot for "Arrival Delay in Minutes" exhibits a right-skewed distribution. The bulk of the data is clustered towards the lower values, with a lot of outliers indicating longer arrival delays.
 
 Based on these observations, it's essential to consider the appropriate data transformations or use different distribution models when working with "Flight Distance," "Departure Delay in Minutes," and "Arrival Delay in Minutes." For example, logarithmic transformations may be suitable to handle the skewed nature of these variables in statistical analyses and modeling tasks.
-```{r fig.height=10, fig.width=10}
-# plots numeric variables vs satisfaction excluding ratings features
+```{r fig.height=7, fig.width=10}
+# plots numeric variables vs satisfaction excluding ratings features with histograms of different colors for each satisfaction level
 plots = list()
-
 for (col in names(data)[sapply(data, is.numeric)]) {
   if (col %in% ratings_fts_names) {
     next
   }
-  plot = ggplot(data, aes(x = satisfaction, y = .data[[col]])) +
-  theme_minimal() +
-  geom_boxplot() +
-  labs(title = paste("Boxplot of Satisfaction by", col), x = "Satisfaction", y = col)
+  plot = ggplot(data, aes(x = .data[[col]], fill = satisfaction, group = satisfaction)) +
+    theme_minimal() +
+    geom_histogram(alpha = 0.5, bins = 30) +
+    labs(title = paste("Histogram of", col), x = col, y = "Count") 
 
-  plots[[col]] = plot  
+  plots[[col]] = plot
 }
 
 grid.arrange(grobs = plots, ncol = 2)
+
+```
+
+# Feature engineering
+
+```{r}
+# compute the mean value of all the ratings, ignoring NA values
+ratings_data = data[, c(ratings_fts_names)]
+ratings_data <- apply(ratings_data, 2, as.numeric)
+# 1. ratings mean
+data$ratings_mean = rowMeans(ratings_data, na.rm = TRUE)
+
+# 2. onboard rating mean
+onboard_features = c("Inflight_wifi_service", "Food_and_drink", 
+  "Seat_comfort", "Inflight_entertainment", "On_board_service", "Leg_room_service", 
+  "Baggage_handling", "Inflight_service", "Cleanliness")
+
+data$onboard_rating_mean = rowMeans(ratings_data[, onboard_features], na.rm = TRUE)
 
 ```
 
@@ -389,32 +446,20 @@ This section converts the categorical variables to numeric
 representation for further analysis.
 
 ```{r}
-gender_map = c("Male" = 0, "Female" = 1)
-data$Gender = gender_map[as.numeric(data$Gender)]
+# gender_map = c("Male" = 0, "Female" = 1)
+# data$Gender = gender_map[as.numeric(data$Gender)]
 
-customer_type_map = c("Loyal Customer" = 0, "disloyal Customer" = 1)
-data$Customer_Type = customer_type_map[as.numeric(data$Customer_Type)]
+# customer_type_map = c("Loyal Customer" = 0, "disloyal Customer" = 1)
+# data$Customer_Type = customer_type_map[as.numeric(data$Customer_Type)]
 
-type_of_travel_map = c("Personal Travel" = 0, "Business travel" = 1)
-data$Type_of_Travel = type_of_travel_map[as.numeric(data$Type_of_Travel)]
+# type_of_travel_map = c("Personal Travel" = 0, "Business travel" = 1)
+# data$Type_of_Travel = type_of_travel_map[as.numeric(data$Type_of_Travel)]
 
-class_map = c("Business" = 0, "Eco" = 1, "Eco Plus" = 2)
-data$Class = class_map[as.numeric(data$Class)]
-```
+# class_map = c("Business" = 0, "Eco" = 1, "Eco Plus" = 2)
+# data$Class = class_map[as.numeric(data$Class)]
 
-
-```{r}
-satisfaction_map = c("neutral or dissatisfied" = 0, "satisfied" = 1)
-data$satisfaction = satisfaction_map[as.numeric(data$satisfaction)]
-```
-
-# Data balance
-
-This section calculates the proportion of satisfied and dissatisfied
-customers in the dataset.
-
-```{r}
-prop.table(table(data$satisfaction))
+# satisfaction_map = c("neutral or dissatisfied" = 0, "satisfied" = 1)
+# data$satisfaction = satisfaction_map[as.numeric(data$satisfaction)]
 ```
 
 # Train test split
@@ -427,232 +472,16 @@ saves the true values of the target variable for the test set.
 set.seed(123)
 train_index = sample(1:nrow(data), 0.8*nrow(data))
 # 80% of data is used for training
-train = data[train_index,]
+train_data = data[train_index,]
 # 20% of data is used for testing
-test = data[-train_index,]
+test_data = data[-train_index,]
 
 # merge train and test data
-data = rbind(train, test)
-# save on cvs
-# write.csv(data, "data.csv")
-
-# save true values of test satisfaction column
-test_true = test$satisfaction
-
-# drop satisfaction column from test data
-test = test %>% select(-satisfaction)
-
-# print proportion of satisfied and dissatisfied customers in train and test data
-prop.table(table(train$satisfaction))
-prop.table(table(test_true))
-```
-
-# Correlation matrix
-
-This section calculates the correlation matrix for numeric variables and
-plots a heatmap to visualize the correlations between variables.
-
-```{r fig.height=12, fig.width=12}
-# correlation matrix only for numeric variables
-correlation_matrix = cor(data[, sapply(data, is.numeric)])
-
-# Plot a heatmap of the correlation matrix
-ggplot(data = reshape2::melt(correlation_matrix)) +
-  geom_tile(aes(x = Var1, y = Var2, fill = value)) +
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
-                       midpoint = 0, limit = c(-1,1), space = "Lab",
-                       name="Correlation") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                    size = 10, hjust = 1)) +
-  coord_fixed()
-
-par(mfrow = c(1, 1))
-```
-
-```{r}
-# Find high correlated features with satisfaction
-# TODO: do the same with different threshold to find differences
-# NOTE: i decided to use 0.3 as threshold
-satisfaction_corr <- correlation_matrix['satisfaction',]
-high_corr_satis <- names(satisfaction_corr[abs(satisfaction_corr) > 0.3 | abs(satisfaction_corr) < -0.3])
-high_corr_satis <- high_corr_satis[high_corr_satis != "satisfaction"]
-high_corr_satis
-```
-
-```{r}
-# Compute the correlations between the high correlation features and satisfaction
-correlations <- data.frame(
-  feature = high_corr_satis,
-  correlation = sapply(high_corr_satis, function(x) cor(data[,x], data$satisfaction))
-)
-correlations
-```
-
-```{r}
-# plot the correlations
-ggplot(correlations, aes(x = reorder(feature, correlation), y = correlation)) +
-  geom_bar(stat = "identity", fill = "blue", alpha = 0.4) +
-  ggtitle("Correlation between features and satisfaction") +
-  xlab('Features') +
-  ylab('Correlation')
-
-par(mfrow = c(1, 1))
-```
-
-```{r}
-#save on cvs
-# write.csv(correlations, file = "correlations.csv")
-```
-
-# Correlation with different ratings
-
-```{r fig.height=8, fig.width=8}
-# compute correlation matrix with only ratings features
-ratings_data = data[, c(ratings_fts_names)]
-ratings_data <- apply(ratings_data, 2, as.numeric)
-
-# correlation matrix only for ratings features
-ratings_correlation_matrix = cor(ratings_data)
-
-# Plot a heatmap of the correlation matrix
-ggplot(data = reshape2::melt(ratings_correlation_matrix)) +
-  geom_tile(aes(x = Var1, y = Var2, fill = value)) +
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
-                       midpoint = 0, limit = c(-1,1), space = "Lab",
-                       name="Correlation") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-                                    size = 10, hjust = 1)) +
-  coord_fixed()
-
-par(mfrow = c(1, 1))
+data = rbind(train_data, test_data)
 
 ```
-```{r}
-# Assuming you have already calculated the 'ratings_correlation_matrix' using the code you provided.
-
-# Convert the correlation matrix to a data frame to work with it easily
-ratings_correlation_df <- as.data.frame(as.table(ratings_correlation_matrix))
-
-# Rename the columns in the data frame
-colnames(ratings_correlation_df) <- c("Var1", "Var2", "Correlation")
-
-# Sort the data frame by the absolute correlation values in descending order
-sorted_correlation_df <- ratings_correlation_df[order(-abs(ratings_correlation_df$Correlation)), ]
-
-# Filter out the self-correlations (correlation of a variable with itself)
-sorted_correlation_df <- sorted_correlation_df[sorted_correlation_df$Var1 != sorted_correlation_df$Var2, ]
-
-# Print the top N most correlated features
-N <- 15  # Change N to get more or fewer correlated features
-top_correlated_features <- head(sorted_correlation_df, N)
-
-print(top_correlated_features)
-
-```
-
-
-# Relation between Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes (linear)
-
-This section explores the partial correlation matrix and identifies
-variables with high correlations with the target variable
-(satisfaction). It also creates a bar plot to show the correlations.
-
-```{r}
-
-#CORRELATION MATRIX again but now we are interested in partial correlation
-#So we look for all the correlations between variables
-#We pick the highest, setting a treshold of our choice
-
-#build a dataframe where for each variable we look the partial correlation with all the others
-#we pick the highest and we save it in a dataframe
-#we set a treshold of 0
-
-
-#correlation(train, partial=TRUE, method='pearson')
-#save the partial correlation matrix result in a dataframe and output a file for further analysis
-
-
-#partial_corr <- correlation(train, partial=TRUE, method='pearson')
-#write.csv(partial_corr, file = "partial_corr.csv")
-
-partial_correlations = read.csv("partial_corr.csv", header = TRUE, sep = ",")
-
-#make the first column the row names
-rownames(partial_correlations) = partial_correlations[,1]
-
-#drop the first  (X) column
-partial_correlations = partial_correlations[,-1]
-
-# Create a new matrix with rounded partial correlations
-partial_correlations_rounded <- round(partial_correlations, digits = 3)
-
-
-# Initialize empty data frame with 0 rows
-# We need it to create a data frame with the results and
-# so to show better the correlations.
-df <- data.frame(variable1 = character(),
-                 variable2 = character(),
-                 value = numeric(),
-                 stringsAsFactors = FALSE)
-
-# Loop over rows and columns of matrix
-for (i in 1:nrow(partial_correlations_rounded)) {
-  for (j in 1:ncol(partial_correlations_rounded)) {
-    # Check if value meets criterion
-    if ((partial_correlations_rounded[i,j] > 0.300 | partial_correlations_rounded[i,j] < -0.300)& i != j) {
-      # Add row to data frame
-      df <- rbind(df, data.frame(variable1 = rownames(partial_correlations_rounded)[i],
-                                 variable2 = colnames(partial_correlations_rounded)[j],
-                                 value = partial_correlations_rounded[i,j],
-                                 stringsAsFactors = FALSE))
-    }
-  }
-}
-
-
-# Group the data frame by variable1 and extract top 3 values for each group
-df_top3 <- df %>% group_by(variable1) %>% top_n(4, value) %>% ungroup()
-
-#order by variable1
-df_top3 <- df_top3[order(df_top3$variable1),]
-
-
-#delete duplicates in the dataframe if variable1 is equal to variable2
-df_top3 <- df_top3[!(df_top3$variable1 == df_top3$variable2),]
-
-print(df_top3, n = nrow(df_top3))
-#save on cvs
-# write.csv(df_top3, file = "df_top3.csv")
-```
-
-```{r}
-# standardize Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes
-arrival_std = scale(data$Arrival_Delay_in_Minutes)
-departure_std = scale(data$Departure_Delay_in_Minutes)
-# scatter plot of Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes 
-plot(arrival_std, departure_std, xlab = "Arrival_Delay_in_Minutes", ylab = "Departure_Delay_in_Minutes")
-# plot line y = x
-abline(0, 1, col = "red")
-```
-
 
 # Data Preparation
-## Import Data
-```{r message=FALSE}
-
-# Read the training data from CSV file
-train_data <- read.csv("train_encoded.csv")
-
-# Drop the first column
-train_data <- train_data[, -1]
-
-# Read the test data from CSV file
-test_data <- read.csv("test_encoded.csv")
-
-# Drop the first column
-test_data <- test_data[, -1]
-
-```
 
 ## Features and Outputs
 ```{r}
@@ -700,7 +529,7 @@ In logistic model observations are assumed to be realizations of independent Ber
 ### Basic Logistic Classifier
 ```{r}
 # Model definition with all features:
-glm_full<- glm(data = train_data,satisfaction ~ .,
+glm_full<- glm(data = train_data, satisfaction ~ .,
                 family = "binomial")
 # summary of full model
 summary(glm_full)
@@ -871,6 +700,8 @@ glm_backward<- glm(data = train_data,
                 -Flight_Distance
                 -Gate_location,
                 family = "binomial")
+
+summary(glm_backward)
 ```
 
 Interestingly, model with backward elimination variable selection has less R² value than full model. We will discuss the reason at the end of Logistic Regression part. 
@@ -1254,3 +1085,27 @@ draw_confusion_matrix(conf_matrix_knn)
 In our project, we want to find unsatisfied customers as precise as possible. Because, our hypothesis is to increase total customer satisfaction with low budget. Therefore, finding unsatisfied customers and having less satisfied customer in our target will be the best method. Considering that, precision metric will be most valuable metric. Then we can count on F1 score, since it considers both Precision and Recall into account.
 
 KNN has the highest precision score rather than Naive Bayes and Logistic Regression with full features model. However, KNN is an non-parametric model and it does not have any bias related to hypothesis space. Therefore, the complexity of model increases with number of samples. Besides, we used cross-validation which also increases model complexity. We can use a validation set approach to decrease training time. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

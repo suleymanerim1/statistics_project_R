@@ -255,6 +255,8 @@ glm_backward<- glm(data = train_data,
                 -Flight_Distance
                 -Gate_location,
                 family = "binomial")
+
+summary(glm_backward)
 ```
 
 Interestingly, model with backward elimination variable selection has less R² value than full model. We will discuss the reason at the end of Logistic Regression part. 
