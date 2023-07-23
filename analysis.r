@@ -7,6 +7,7 @@ library(correlation)
 library(reshape)
 library(reshape2)
 
+
 data_train = read.csv("train.csv")
 data_test = read.csv("test.csv")
 
@@ -234,45 +235,68 @@ prop.table(table(test_true))
 ##############################################
 
 # CORRELATION MATRIX
+# First, let's check if categorical variables are independent 
+# performing a chi-square test of independence.
 
-# correlation matrix only for numeric variables
-correlation_matrix = cor(data[, sapply(data, is.numeric)])
+# Chi-square test of independence
+# H0: the two variables are independent
+# H1: the two variables are not independent
+# p-value < 0.05 -> reject H0 -> the two variables are not independent
 
-# Plot a heatmap of the correlation matrix
-ggplot(data = reshape2::melt(correlation_matrix)) +
-  geom_tile(aes(x = Var1, y = Var2, fill = value)) +
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
-                       midpoint = 0, limit = c(-1,1), space = "Lab",
-                       name="Correlation") +
-  theme(axis.text.x = element_text(angle = 90, vjust = 1, 
-                                    size = 10, hjust = 1)) +
-  coord_fixed()
+# first: find categorical variables
+categorical_variables = c()
+for (col in names(data)[sapply(data, is.factor)]) {
+  categorical_variables = c(categorical_variables, col)
+}
+categorical_variables
 
-# Find high correlated features with satisfaction
-# NOTE: i decided to use 0.3 as threshold
-satisfaction_corr <- correlation_matrix['satisfaction',]
-high_corr_satis <- names(satisfaction_corr[abs(satisfaction_corr) > 0.3 | abs(satisfaction_corr) < -0.3])
-high_corr_satis <- high_corr_satis[high_corr_satis != "satisfaction"]
-high_corr_satis
-
-
-# Compute the correlations between the high correlation features and satisfaction
-correlations <- data.frame(
-  feature = high_corr_satis,
-  correlation = sapply(high_corr_satis, function(x) cor(data[,x], data$satisfaction))
+# second: perform chi-square test of independence
+# save the results of chi-square test of independence in a dataframe
+chi_square_results = data.frame(
+  feature1 = character(),
+  feature2 = character(),
+  p_value = numeric(),
+  stringsAsFactors = FALSE
 )
-correlations
 
-# plot the correlations
-ggplot(correlations, aes(x = reorder(feature, correlation), y = correlation)) +
+# loop over all the categorical variables
+for (i in 1:length(categorical_variables)) {
+  # loop over all the categorical variables
+  for (j in 1:length(categorical_variables)) {
+    # check if the two variables are different
+    if (i != j) {
+      # perform chi-square test of independence
+      chi_square_test = chisq.test(data[[categorical_variables[i]]], data[[categorical_variables[j]]])
+      # save the results in a dataframe
+      chi_square_results = rbind(chi_square_results, data.frame(
+        feature1 = categorical_variables[i],
+        feature2 = categorical_variables[j],
+        p_value = chi_square_test$p.value,
+        stringsAsFactors = FALSE
+      ))
+    }
+  }
+}
+
+# order the dataframe by p_value
+chi_square_results = chi_square_results[order(chi_square_results$p_value),]
+chi_square_results
+
+# plot chi-square test of independence results
+ggplot(chi_square_results, aes(x = reorder(feature1, p_value), y = p_value)) +
   geom_bar(stat = "identity", fill = "blue", alpha = 0.4) +
-  ggtitle("Correlation between features and satisfaction") +
+  ggtitle("Chi-square test of independence") +
   xlab('Features') +
-  ylab('Correlation')
+  ylab('p-value')
+
+# check if p-value > 0.05 for all the variables then output "False" or "True" with the corrisponding names of variables
+chi_square_results$independent = chi_square_results$p_value > 0.05
+chi_square_results
 
 
-#save on cvs
-write.csv(correlations, file = "correlations.csv")
+
+
+
 
 ##############################################
 
@@ -438,6 +462,45 @@ ggplot(data, aes(x = Class, fill = Type_of_Travel)) +
 
 
 
+
+
+
+
+
+
+
+######################################################
+# ANOVA
+
+# libraries
+library(ggplot2)
+library(car)
+library(stats)
+library(dplyr)
+library(rstatix)
+library(ggpubr)
+# To apply anova we have to see if the ANOVA conditions are satisfied.
+# 1. The samples are independent
+# 2. The samples are from normally distributed populations
+# 3. The population standard deviations of the groups are all equal
+
+bartlett.test(data$satisfaction ~ data$Gate_location)
+# do a boxplot comparisons between the groups
+
+ggplot(data, aes(x = Gate_location, y = satisfaction, fill = Gate_location)) +
+  geom_boxplot() +
+  theme_minimal()
+
+# count number of examples for each group of gate locations
+table(data$Gate_location)
+
+# we have that at gate loc 0 there is only one flight, useless for further considerations.
+# drop it only for the barlett test, inside the function
+bartlett.test(data$satisfaction[-which(data$Gate_location == 0)] ~ data$Gate_location[-which(data$Gate_location == 0)])
+
+
+#see the entire row of gate location 0
+data[data$Gate_location == 0,]
 
 
 #LOGISTIC REGRESSION MODELS
