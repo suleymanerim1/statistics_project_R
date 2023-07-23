@@ -30,6 +30,10 @@ data$Type_of_Travel = factor(data$Type_of_Travel, levels = c("Personal Travel", 
 data$Class = factor(data$Class, levels = c("Business", "Eco Plus", "Eco"))
 data$satisfaction = factor(data$satisfaction, levels = c("neutral or dissatisfied", "satisfied"))
 
+# creating data for chi-square test of independence.
+data_chi_test = data
+
+
 ######################################################
 
 #   HANDLING NA VALUES
@@ -234,67 +238,29 @@ prop.table(table(test_true))
 
 ##############################################
 
-# CORRELATION MATRIX
-# First, let's check if categorical variables are independent 
-# performing a chi-square test of independence.
+## CORRELATION MATRIX FOR NUMERICAL VARIABLES
 
-# Chi-square test of independence
-# H0: the two variables are independent
-# H1: the two variables are not independent
-# p-value < 0.05 -> reject H0 -> the two variables are not independent
-
-# first: find categorical variables
-categorical_variables = c()
-for (col in names(data)[sapply(data, is.factor)]) {
-  categorical_variables = c(categorical_variables, col)
-}
-categorical_variables
-
-# second: perform chi-square test of independence
-# save the results of chi-square test of independence in a dataframe
-chi_square_results = data.frame(
-  feature1 = character(),
-  feature2 = character(),
-  p_value = numeric(),
-  stringsAsFactors = FALSE
-)
-
-# loop over all the categorical variables
-for (i in 1:length(categorical_variables)) {
-  # loop over all the categorical variables
-  for (j in 1:length(categorical_variables)) {
-    # check if the two variables are different
-    if (i != j) {
-      # perform chi-square test of independence
-      chi_square_test = chisq.test(data[[categorical_variables[i]]], data[[categorical_variables[j]]])
-      # save the results in a dataframe
-      chi_square_results = rbind(chi_square_results, data.frame(
-        feature1 = categorical_variables[i],
-        feature2 = categorical_variables[j],
-        p_value = chi_square_test$p.value,
-        stringsAsFactors = FALSE
-      ))
-    }
-  }
-}
-
-# order the dataframe by p_value
-chi_square_results = chi_square_results[order(chi_square_results$p_value),]
-chi_square_results
-
-# plot chi-square test of independence results
-ggplot(chi_square_results, aes(x = reorder(feature1, p_value), y = p_value)) +
-  geom_bar(stat = "identity", fill = "blue", alpha = 0.4) +
-  ggtitle("Chi-square test of independence") +
-  xlab('Features') +
-  ylab('p-value')
-
-# check if p-value > 0.05 for all the variables then output "False" or "True" with the corrisponding names of variables
-chi_square_results$independent = chi_square_results$p_value > 0.05
-chi_square_results
+ds_cor1 <- cor(subset(data,select = c(Age, Flight_Distance,Departure_Delay_in_Minutes,Arrival_Delay_in_Minutes, satisfaction)))
+summary(ds_cor1)
+options(repr.plot.width = 14, repr.plot.height = 8)
+corrplot(ds_cor1, na.label = " ", method="color", tl.col = "black", tl.cex = 1)
 
 
 
+
+## CORRELATION MATRIX FOR ORDINAL VARIABLES
+
+ds_cor2 <- cor(subset(data, select = c(Inflight_wifi_service, Departure_Arrival_time_convenient, Ease_of_Online_booking, Gate_location, Food_and_drink, Online_boarding, Seat_comfort, Inflight_entertainment, On_board_service, Leg_room_service, Baggage_handling, Checkin_service, Inflight_service,Cleanliness, satisfaction)))
+summary(ds_cor2)
+options(repr.plot.width = 14, repr.plot.height = 8)
+corrplot(ds_cor2, na.label=" ", tl.cex=1, tl.col="black", method="color")
+
+## CORRELATION MATRIX FOR CATEGORICAL VARIABLES
+
+ds_cor3 = cor(subset(data, select = c(Gender, Class, Type_of_Travel, Customer_Type, satisfaction))) 
+summary(ds_cor3)
+options(repr.plot.width = 14, repr.plot.height = 8)
+corrplot(ds_cor3, na.label=" ", tl.cex=1, tl.col="black", method="color")
 
 
 
@@ -377,27 +343,71 @@ grid.arrange(a, b, c, d, e, f, g, h, ncol = )
 
 #build a dataframe where for each variable we look the partial correlation with all the others
 #we pick the highest and we save it in a dataframe
-#we set a treshold of 0
+#we set a threshold of 0
 
+library(corrr)
+library(viridis)
 
-#correlation(train, partial=TRUE, method='pearson')
 #save the partial correlation matrix result in a dataframe and output a file for further analysis
 
-
-#partial_corr <- correlation(train, partial=TRUE, method='pearson')
-#write.csv(partial_corr, file = "partial_corr.csv")
+# do the partial correlation only for numerical variables
+partial_corr = correlation(data[,sapply(data, is.numeric)], partial=TRUE, method = "spearman", use = "pairwise.complete.obs", verbose = TRUE)
+write.csv(partial_corr, file = "partial_corr.csv")
 
 partial_correlations = read.csv("partial_corr.csv", header = TRUE, sep = ",")
 
+
+head(partial_correlations)
 #make the first column the row names
+
 rownames(partial_correlations) = partial_correlations[,1]
 
-colnames(partial_correlations)
-#drop the first  (X) column
+# delete the first column
 partial_correlations = partial_correlations[,-1]
 
-# Create a new matrix with rounded partial correlations
-partial_correlations_rounded <- round(partial_correlations, digits = 3)
+#round the values
+partial_correlations_rounded = round(partial_correlations, digits = 3)
+
+
+
+
+# Assuming your correlation matrix dataframe is named "correlation_matrix"
+# Replace "correlation_matrix" with the actual name of your dataframe if different
+
+# Remove the first column (variable names) to keep only numeric values
+correlation_matrix_numeric <- partial_correlations[, -1]
+
+# Convert the data to a matrix
+correlation_matrix_matrix <- as.matrix(partial_correlations)
+
+
+# Melt the data to create a tidy data format suitable for ggplot2
+library(reshape2)
+correlation_matrix_melted <- melt(correlation_matrix_matrix)
+correlation_matrix_melted$value <- as.numeric(correlation_matrix_melted$value)
+correlation_matrix_melted
+
+# Create the heatmap using ggplot2
+ggplot(correlation_matrix_melted, aes(x = Var2, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient(low = "blue", high = "red") + # Choose your desired color scale
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate the x-axis labels
+
+
+
+
+
+correlation_matrix_melted$value
+
+
+
+
+
+
+
+
+
 
 
 # Initialize empty data frame with 0 rows
@@ -423,7 +433,6 @@ for (i in 1:nrow(partial_correlations_rounded)) {
     }
   }
 }
-
 
 # Group the data frame by variable1 and extract top 3 values for each group
 df_top3 <- df %>% group_by(variable1) %>% top_n(4, value) %>% ungroup()
