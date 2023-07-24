@@ -187,20 +187,10 @@ prop.table(table(is.na(data$Arrival_Delay_in_Minutes)))
 ```
 Indeed, since the proportion of missing values for the "Arrival_Delay_in_Minutes" variable is very low (less than 3% of the entire dataset), it is reasonable to proceed with dropping these missing values from the dataset. 
 ```{r}
-# na values are only 0.03% of the data -> drop na values
-# Check for missing values in "Arrival_Delay_in_Minutes"
-# Check if there are any NA values in the "Arrival_Delay_in_Minutes" column
-print(sum(is.na(data$Arrival_Delay_in_Minutes)))
+# drop na values in Arrival_Delay_in_Minutes
+data = data[!is.na(data$Arrival_Delay_in_Minutes),]
 
-# Impute missing values with 0
-data$Arrival_Delay_in_Minutes[is.na(data$Arrival_Delay_in_Minutes)] <- 0
-
-# Check again for any NA values in the "Arrival_Delay_in_Minutes" column
-print(sum(is.na(data$Arrival_Delay_in_Minutes)))
-
-# Check the proportion of NA values in the entire dataset
-prop.table(colSums(is.na(data)))
-
+any(is.na(data))
 ```
 
 ## Outliers
@@ -470,6 +460,9 @@ saves the true values of the target variable for the test set.
 
 ```{r}
 set.seed(123)
+data$satisfaction <- ifelse(data$satisfaction == "satisfied", 1, 0)
+data$satisfaction <- factor(data$satisfaction, levels = c(0, 1))
+
 train_index = sample(1:nrow(data), 0.8*nrow(data))
 # 80% of data is used for training
 train_data = data[train_index,]
@@ -529,29 +522,54 @@ In logistic model observations are assumed to be realizations of independent Ber
 ### Basic Logistic Classifier
 ```{r}
 # Model definition with all features:
-glm_full<- glm(data = train_data, satisfaction ~ .,
+glm_full<- glm(data = train_data, satisfaction ~ . ,
                 family = "binomial")
 # summary of full model
 summary(glm_full)
 ```
+
+(Giacomo) There are some NA values due to numerical instability (too many features) so we need to remove collinear features.
+Based on the EDA, we know that some feature have no discriminative power like Gender, Age and Flight_Distance. 
+From the correlation matrix then we know that Departure_Delay_in_Minutes and Arrival_Delay_in_Minutes are highly correlated so arbitrarly remove one of them.
+By observing the glm output we can see that a lot of rating features have a really high p-value so we can remove them too because they are not statistically significant.
+For example, Gate_location has a p-value greater than 0.99 and from the eda we know that it has no discriminative power.
+Seat_comfort, Inflight_service, Cleanliness, Inflight_entertainment and On_board_service have a p-value greater than 0.95 and from the eda we can see that their distribution agains satisfaction are quite identical.
+```{r}
+# Model definition with all features:
+glm_reduced<- glm(data = train_data, satisfaction ~ . - Departure_Delay_in_Minutes - Age - Flight_Distance - Gender
+                                                    - Gate_location - Seat_comfort - Inflight_entertainment - On_board_service
+                                                    - Inflight_service - Cleanliness - Checkin_service,
+                family = "binomial")
+# summary of full model
+summary(glm_reduced)
+```
+
 As we can see from model statistics, the p value of "flight distance" feature is not lower than 0.5 which indicates that the effect of "flight distance" on prediction of satisfaction is insignificant. However, we would like to keep all features in the model for now. Then we will full model with feature selection models.
 
 In the code snippet below, we can observe the calculation goodness of fit, also known as R-squared (R²). R² serves as a metric to assess how well the GLM (Generalized Linear Model) model aligns with the given data in comparison to a null model, which solely consists of an intercept without any predictors. The R² value is derived using a simple formula: 1 minus the ratio of the deviance of the fitted model to the deviance of the null model. 
 
 R² value provides insights into the amount of variation in the data that can be accounted for by the model, thus serving as a measure of its effectiveness.
 
-```{r}
-r2<- 1 - (summary(glm_full)$deviance/summary(glm_full)$null.deviance)
-r2
-```
-
-
-In the provided line of code, the calculation of the variance inflation factor (VIF) is performed by taking the reciprocal of 1 minus the R² value. The VIF serves as a metric to evaluate the presence of multicollinearity, which refers to the correlation between predictor variables within a model. High levels of multicollinearity can introduce issues regarding the reliability and interpretability of the GLM (Generalized Linear Model).
 
 ```{r}
-1/(1-r2)
+r2_full <- 1 - (summary(glm_full)$deviance/summary(glm_full)$null.deviance)
+vif_full = 1/(1-r2_full)
+r2_full
+vif_full
 ```
 
+```{r}
+r2_reduced<- 1 - (summary(glm_reduced)$deviance/summary(glm_reduced)$null.deviance)
+vif_reduced = 1/(1-r2_reduced)
+r2_reduced
+vif_reduced
+```
+
+(Giacomo) Comparing the R² sqaured values, we can see that dropping some features does not affect the model performance. 
+This is a good sign because we can reduce the complexity of the model without losing performance.
+
+Furthermore, the calculation of the variance inflation factor (VIF) is performed by taking the reciprocal of 1 minus the R² value. The VIF serves as a metric to evaluate the presence of multicollinearity, which refers to the correlation between predictor variables within a model. High levels of multicollinearity can introduce issues regarding the reliability and interpretability of the GLM (Generalized Linear Model).
+Even here we can notice that the VIF values decreased meaning that the model has less collinearity between features.
 
 
 ### Logistic Regression with Backward Variable Selection
@@ -569,146 +587,52 @@ To address high collinearity, we may choose to remove certain predictor variable
 Variable selection is crucial in regression models to ensure interpretability, computational efficiency, and generalization. It involves removing irrelevant variables, reducing redundancy, and combating overfitting. By choosing relevant variables, the model becomes easier to interpret, algorithms work faster with high-dimensional data, and overfitting is reduced. The focus is on low test error rather than training error. Variable selection is especially important for high-dimensional datasets with more features than observations. Here, we are gonna use backward selection starting from full model and reducing number of variables in order of high VIF factor to lower VIF factors to decrease multi-collinearity and increase robustness of model.
 
 ```{r}
-
 # VIF Iteration 0
 # The process is done iteratively where we delete one variable at time
-vif_values <- VIF(glm_full)
-
-# Create a data frame with variable names and their corresponding VIF values
-vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
-
-# Sort the data frame in decreasing order of VIF values
-sorted_df <- vif_df[order(-vif_df$VIF), ]
-rownames(sorted_df) <- NULL
-
-# Print the sorted data frame
-print(sorted_df)
+vif_values <- VIF(glm_reduced)
+vif_values
 ```
+From the vif table we can see that some feature has a VIF value greater than 5. Thus we can proceed by removing one of them and check the VIF again.
+
+
+
+
 ```{r}
 # VIF Iteration 1
 # The process is done iteratively where we delete one variable at time
 # Model definition:
-glm_vif1<- glm(data = train_data,
-                satisfaction ~ .-Arrival_Delay_in_Minutes,
-                family = "binomial")
+glm_vif1<- update(glm_reduced, . ~ .-Ease_of_Online_booking, family = "binomial")
+summary(glm_vif1)
 vif_values <- VIF(glm_vif1)
-
-# Create a data frame with variable names and their corresponding VIF values
-vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
-
-# Sort the data frame in decreasing order of VIF values
-sorted_df <- vif_df[order(-vif_df$VIF), ]
-rownames(sorted_df) <- NULL
-
-# Print the sorted data frame
-print(sorted_df)
+vif_values
 ```
+We can see that ratings_mean and onboard_rating_mean have a VIF value greater than 5. Thus we can say that the VIF spotted a probable collinearity relationship between these two features.
 
 ```{r}
 # VIF Iteration 2
 # The process is done iteratively where we delete one variable at time
 # Model definition:
-glm_vif2<- glm(data = train_data,
-                satisfaction ~ .
-               -Arrival_Delay_in_Minutes
-               -Inflight_entertainment,
-                family = "binomial")
+glm_vif2<- update(glm_vif1, . ~ . - onboard_rating_mean, family = "binomial")
+summary(glm_vif1)
 vif_values <- VIF(glm_vif2)
-
-# Create a data frame with variable names and their corresponding VIF values
-vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
-
-# Sort the data frame in decreasing order of VIF values
-sorted_df <- vif_df[order(-vif_df$VIF), ]
-rownames(sorted_df) <- NULL
-
-# Print the sorted data frame
-print(sorted_df)
+vif_values
 ```
-
+We can notice that removing onboard_rating_mean the VIF of ratings_mean decreased. This is a good sign because we are reducing the collinearity between features.
+Inflight_wifi_service still remained above 5 for all the iteration so we can proceed by removing it.
 ```{r}
 # VIF Iteration 3
 # The process is done iteratively where we delete one variable at time
 # Model definition:
-glm_vif3<- glm(data = train_data,
-                satisfaction ~ .
-                -Arrival_Delay_in_Minutes
-                -Inflight_entertainment
-                -Ease_of_Online_booking	,
-                family = "binomial")
+glm_vif3<- update(glm_vif2, . ~ . - Inflight_wifi_service, family = "binomial")
+summary(glm_vif3)
 vif_values <- VIF(glm_vif3)
-
-# Create a data frame with variable names and their corresponding VIF values
-vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
-
-# Sort the data frame in decreasing order of VIF values
-sorted_df <- vif_df[order(-vif_df$VIF), ]
-rownames(sorted_df) <- NULL
-
-# Print the sorted data frame
-print(sorted_df)
+vif_values
 ```
 
 ```{r}
-# VIF Iteration 4
-# The process is done iteratively where we delete one variable at time
-# Model definition:
-glm_vif4<- glm(data = train_data,
-                satisfaction ~ .
-               -Arrival_Delay_in_Minutes
-               -Inflight_entertainment
-               -Ease_of_Online_booking 
-               -Cleanliness	,
-                family = "binomial")
-vif_values <- VIF(glm_vif4)
-
-# Create a data frame with variable names and their corresponding VIF values
-vif_df <- data.frame(Variable = names(vif_values), VIF = vif_values,row.names = NULL)
-
-# Sort the data frame in decreasing order of VIF values
-sorted_df <- vif_df[order(-vif_df$VIF), ]
-rownames(sorted_df) <- NULL
-
-# Print the sorted data frame
-print(sorted_df)
-```
-
-We deleted all the features with VIF greater than 2 to decrease multicollinearity. Let's check the current model statistics.
-
-```{r}
-glm_reduced<- glm(data = train_data,
-                satisfaction ~ .
-                -Arrival_Delay_in_Minutes
-                -Inflight_entertainment
-                -Ease_of_Online_booking 
-                -Cleanliness	,
-                family = "binomial")
-# Observation of the model summary:
-summary(glm_reduced)
-```
-"Flight_Distance" and "Gate_location" features are insignificant in prediction of satisfaction. Let's drop them from model.
-
-```{r}
-# Drop Flight_Distance and Gate_location from model.
-
-glm_backward<- glm(data = train_data,
-                satisfaction ~ .
-                -Arrival_Delay_in_Minutes
-                -Inflight_entertainment
-                -Ease_of_Online_booking 
-                -Cleanliness
-                -Flight_Distance
-                -Gate_location,
-                family = "binomial")
-
-summary(glm_backward)
-```
-
-Interestingly, model with backward elimination variable selection has less R² value than full model. We will discuss the reason at the end of Logistic Regression part. 
-
-```{r}
-r2<- 1 - (summary(glm_backward)$deviance/summary(glm_backward)$null.deviance)
-r2
+r2_vif<- 1 - (summary(glm_vif3)$deviance/summary(glm_vif3)$null.deviance)
+r2_vif
+1/(1-r2_vif)
 ```
 
 
@@ -721,11 +645,12 @@ One disadvantage of ridge regression is that it includes all predictors in the f
 Lambda is the Tuning Parameter that controls the bias-variance tradeoff and we estimate its best value via cross-validation.
 
 ```{r}
-# We look for the best value for lambda
-# We use cross validation glmnet
-glm_lasso <- cv.glmnet(X_train, as.factor(y_train),
-                      alpha = 0, family = "binomial", type.measure = "class")
-plot(glm_lasso)
+# Convert data to matrix format (if not already)
+X_train <- as.matrix(X_train)
+y_train <- as.numeric(y_train)
+
+# Fit lasso regression model with cross-validation
+lasso_model <- cv.glmnet(X_train, y_train, alpha = 1, family = "binomial")
 
 ```
 
@@ -748,11 +673,11 @@ pred_glm_full<- predict(glm_full, data.frame(X_test), type = "response")
 
 # Backward elimination selection
 # Computing the predictions with the model on the test set:
-pred_glm_backward<- predict(glm_backward, data.frame(X_test), type = "response")
+pred_glm_backward<- predict(glm_vif3, data.frame(X_test), type = "response")
 
 # Lasso regresssion
 # Computing the predictions with the model on the test set:
-pred_glm_lasso<- predict(glm_lasso, X_test, type= "response", s = best_lambda)
+# pred_glm_lasso<- predict(glm_lasso, X_test, type= "response", s = best_lambda)
 
 ```
 
