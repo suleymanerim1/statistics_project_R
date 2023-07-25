@@ -1,5 +1,5 @@
 ---
-title: "The Report"
+title: "Airline passengers satisfaction analysis"
 author: "Süleyman Erim, Giacomo Schiavo, Mattia Varagnolo"
 date: "`r Sys.Date()`"
 output: pdf_document
@@ -43,10 +43,8 @@ library(glmnet) # for Lasso Regression
 ```
 
 ```{r message=FALSE}
-data_train = read.csv("C:/Users/matti/Documents/GitHub/stat_project/train.csv")
-data_test = read.csv("C:/Users/matti/Documents/GitHub/stat_project/test.csv")
-
-
+data_train = read.csv("train.csv")
+data_test = read.csv("test.csv")
 
 
 # merge train and test data
@@ -634,7 +632,12 @@ affect each other.
 ```{r}
 ## CORRELATION MATRIX FOR NUMERICAL VARIABLES
 
-ds_cor1 <- cor(subset(data,select = c(Age,Flight_Distance,Departure_Delay_in_Minutes,Arrival_Delay_in_Minutes)))
+ds_cor1 <- cor(subset(data,select = c(
+  Age,
+  Flight_Distance,
+  Departure_Delay_in_Minutes,
+  Arrival_Delay_in_Minutes
+)))
 
 ```
 
@@ -680,7 +683,11 @@ to also have longer arrival delays.
 
 ```{r}
 ## CORRELATION MATRIX FOR ORDINAL VARIABLES
-ordinal_variables = c('Inflight_wifi_service', 'Departure_Arrival_time_convenient', 'Ease_of_Online_booking', 'Gate_location', 'Food_and_drink', 'Online_boarding', 'Seat_comfort', 'Inflight_entertainment', 'On_board_service', 'Leg_room_service', 'Baggage_handling', 'Checkin_service', 'Inflight_service','Cleanliness')
+ordinal_variables = c('Inflight_wifi_service', 'Departure_Arrival_time_convenient',
+                      'Ease_of_Online_booking', 'Gate_location', 'Food_and_drink',
+                      'Online_boarding', 'Seat_comfort', 'Inflight_entertainment',
+                      'On_board_service', 'Leg_room_service', 'Baggage_handling',
+                      'Checkin_service', 'Inflight_service','Cleanliness')
 
 # for each ordinal variables, change the values to numeric
 for (col in ordinal_variables) {
@@ -795,7 +802,11 @@ corrplot(partial_corr_matrix_num,
 )
 
 #PARTIAL CORRELATION MATRIX FOR CATEGORICAL/ORDINAL
-categorical_features = c('Inflight_wifi_service', 'Departure_Arrival_time_convenient', 'Ease_of_Online_booking', 'Gate_location', 'Food_and_drink', 'Online_boarding', 'Seat_comfort', 'Inflight_entertainment', 'On_board_service', 'Leg_room_service', 'Baggage_handling', 'Checkin_service', 'Inflight_service','Cleanliness')
+categorical_features = c('Inflight_wifi_service', 'Departure_Arrival_time_convenient',
+                         'Ease_of_Online_booking', 'Gate_location', 'Food_and_drink',
+                         'Online_boarding', 'Seat_comfort', 'Inflight_entertainment',
+                         'On_board_service', 'Leg_room_service', 'Baggage_handling',
+                         'Checkin_service', 'Inflight_service','Cleanliness')
 partial_correlations_cat <- pcor(data[, categorical_features], method = "spearman")
 
 # make the matrix
