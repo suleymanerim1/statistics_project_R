@@ -20,6 +20,8 @@ This section introduces the purpose of the exploratory data analysis
 ```{r message=FALSE}
 # import libraries
 library(tidyverse)
+library(tinytex)
+library(dplyr)
 library(corrplot)
 library(ggplot2)
 library(gridExtra)
@@ -35,6 +37,8 @@ library(pROC) # for ROC Curve
 library(e1071) # for Naive Bayes Classifier
 library(class)
 library(caret)
+library(corrr)
+library(ppcor)
 library(glmnet) # for Lasso Regression
 ```
 
@@ -135,7 +139,7 @@ In this section of data preprocessing, several steps are performed to prepare th
 
 2. Dropping unnecessary columns: two columns, "X" and "id," are removed from the dataset. The "X" column likely represents the index of the row, which does not carry any meaningful information for analysis. The "id" column is presumed to be an unknown indexing number, which may not contribute to the predictive modeling process.
 
-3. Converting categorical variables to factors: categorical variables, such as "Gender", "Customer Type", "Type of Travel" and "Class" are converted into factors. Converting categorical variables into factors is a common practice in R to represent these variables as distinct levels, allowing for better handling and analysis in statistical models.
+3. Converting categorical variables to factors: categorical variables, such as "Gender", "Customer Type", "Type of Travel" and "Class" are converted into factors. 
 
 By performing these data preprocessing steps, the dataset is cleaned and transformed into a more suitable format for the subsequent analysis, making it easier to build a predictive model for passenger satisfaction.
 
@@ -144,7 +148,7 @@ By performing these data preprocessing steps, the dataset is cleaned and transfo
 # replace dots with underscores in column names
 names(data) = gsub("\\.", "_", names(data))
 # drop X and id column
-data = data %>% select(-X, -id)
+data <- data %>% dplyr::select(-X, -id)
 names(data)
 ```
 
@@ -172,14 +176,15 @@ for (col in ratings_fts_names) {
 
 ## Handling na values
 
-In this section, we analyze the dataset to identify variables with missing values, particularly focusing on the "Arrival_Delay_in_Minutes" variable. We calculate the proportion of missing values for this variable and subsequently remove the examples or rows with missing values from the dataset.
+In this section, we analyze the dataset to identify variables with missing values, particularly focusing on the "Arrival_Delay_in_Minutes" variable. 
+We calculate the proportion of missing values for this variable and subsequently remove the examples or rows with missing values from the dataset.
 
 ```{r}
 # list features with na values
 prop.table(colSums(is.na(data)))
 ```
 
-To determine the proportion of missing values for the "Arrival_Delay_in_Minutes" variable, we can count the number of instances where this variable has missing values (commonly denoted as "NaN" or "NA") and divide it by the total number of examples in the dataset. This will give us the proportion of missing values for the "Arrival_Delay_in_Minutes" variable.
+To determine the proportion of missing values for the "Arrival_Delay_in_Minutes" variable, we can count the number of instances where this variable has missing values (commonly denoted as "NaN" or "NA") and divide it by the total number of examples in the dataset.
 
 ```{r}
 # Arrival_Delay_in_Minutes has na values, proportion of na values
@@ -195,10 +200,9 @@ any(is.na(data))
 
 ## Outliers
 
-In this section, box plots are created for each numeric variable present in the dataset. Box plots are a powerful visualization tool used to identify the presence of outliers in the data. For each numeric variable, the box plot displays a box that represents the interquartile range (IQR), with the median indicated by a line inside the box. The "whiskers" extending from the box show the range of the data, and any data points beyond the whiskers are considered potential outliers.
-
-By examining the box plots for each numeric variable, we can visually identify any data points that lie far outside the typical range of the data, indicating potential outliers. Outliers can significantly impact statistical analyses, so detecting and handling them appropriately is crucial for ensuring the integrity of the dataset and the accuracy of subsequent analyses and modeling.
-
+In this section, box plots are created for each numeric variable present in the dataset. 
+Box plots are a powerful visualization tool used to identify the presence of outliers in the data. 
+For each numeric variable, the box plot displays a box that represents the interquartile range (IQR), with the median indicated by a line inside the box. The "lines" extending from the box show the range of the data, and any data points beyond the lines are considered potential outliers.
 ```{r}
 
 # plot boxplot of each numeric variable excluding ratings features
@@ -217,12 +221,16 @@ grid.arrange(grobs = plots, ncol = 2)
 ```
 We can see that there are outliers in Departure_Delay_in_Minutes, Arrival_Delay_in_Minutes and Flight_Distance.
 Considering the presence of both near-zero and very large values in the dataset, alternative distributions like the log-normal distribution may be more appropriate for modeling the "Departure_Delay_in_Minutes" and "Arrival_Delay_in_Minutes" variables, as they can better capture the variability in delay times.
+We want to keep outliers because they can represent genuine and meaningful observations that offer valuable insights into the data. 
+Retaining outliers allows our analysis to account for extreme scenarios and understand how they contribute to the overall patterns or trends in the dataset. 
 
 # Visualization
 
-In this section, histograms are used to visualize the distribution of the variables in the dataset, starting with the nominal features. By creating histograms for the nominal features, we can gain insights into the distribution of categories within each feature.
+In this section, histograms are used to visualize the distribution of the variables in the dataset, starting with the nominal features so that we can gain insights into the distribution of categories within each feature.
 
-Upon visualizing the nominal features, it becomes apparent that some features exhibit heavily unbalanced distributions. This means that certain categories within these features have significantly higher frequencies compared to others. The presence of such imbalanced distributions could have implications for analysis and modeling, as it may lead to biased results or difficulties in predicting less frequent categories accurately.
+Upon visualizing the nominal features, it becomes apparent that some features exhibit heavily unbalanced distributions. 
+This means that certain categories within these features have significantly higher frequencies compared to others. 
+The presence of such imbalanced distributions could have implications for analysis and modeling, as it may lead to biased results or difficulties in predicting less frequent categories accurately.
 
 ```{r fig.height=8, fig.width=8}
 # plot distribution of categorical variables
@@ -243,15 +251,15 @@ grid.arrange(grobs = plots, ncol = 2)
 ```
 From the analysis of the nominal features, we can observe the following regarding their balance:
 
-1. Gender: The "Gender" feature is almost perfectly balanced, meaning that there is a relatively equal representation of both genders in the dataset.
+1. Gender: it is almost perfectly balanced, meaning that there is a relatively equal representation of both genders in the dataset.
 
-2. Satisfaction: The target feature appears to be imbalanced, with fewer instances of "satisfied" compared to the other class ("dissatisfied"). This imbalance could potentially impact the model's performance, and we need to handle it appropriately during the modeling process.
+2. Satisfaction: the target feature appears to be slightly imbalanced, with fewer instances of "satisfied" compared to the other class ("dissatisfied").
 
-3. Type of Travel: The "Type of Travel" feature shows an imbalance, with more instances of "business travel" compared to "personal travel."
+3. Type of Travel: it shows an imbalance, with more instances of "business travel" compared to "personal travel."
 
-4. Class: The "Class" feature also exhibits imbalance, with "business" and "eco" classes having relatively balanced representations, while the "Eco Plus" class is underrepresented.
+4. Class: it also exhibits imbalance, with "business" and "eco" classes having relatively balanced representations, while the "Eco Plus" class is underrepresented.
 
-5. Customer Type: The "Customer Type" feature shows an imbalance, with a higher number of "loyal customer" instances compared to "disloyal customer."
+5. Customer Type: it shows an imbalance, with a higher number of "loyal customer" instances compared to "disloyal customer."
 
 When dealing with imbalanced data, we need to take specific measures during model training and evaluation to ensure that the model performs well and doesn't exhibit bias towards the majority class. 
 Appropriate techniques such as resampling, using different evaluation metrics or employing specialized algorithms can help address the imbalance and lead to a more accurate and fair predictive model.
@@ -278,7 +286,8 @@ for (col in names(data)[sapply(data, is.factor)]) {
 }
 grid.arrange(grobs = plots, ncol = 3)
 ```
-Based on the graphs showing the histograms of the ratings, we can observe that the majority of them tend to fall between 3 and 4. This conclusion is drawn from the visual representation of the data, where the histogram bars are higher in the range of 3 to 4, indicating a higher frequency of ratings in that range.
+Based on the graphs showing the histograms of the ratings, we can observe that the majority of them tend to fall between 3 and 4. 
+This conclusion is drawn from the visual representation of the data, where the histogram bars are higher in the range of 3 to 4, indicating a higher frequency of ratings in that range.
 
 ```{r}
 # compute the mean value of all the ratings
@@ -289,18 +298,7 @@ ratings_mean
 ```
 
 
-This section presents histograms to visualize the distribution of numeric variables in the dataset. The histograms show that:
-1. The age distribution has two main peaks, one at around 25 and another at around 30-35.
-2. The flight distance distribution can be represented by a log-normal distribution, with a peak at around 500 miles.
-3. The departure delay and arrival delay distributions are very similar, and both show a significant number of outliers.
-
-The histograms provide a useful overview of the distribution of the numeric variables in the dataset. This information can be used to identify potential outliers, and to choose appropriate statistical methods for analyzing the data.
-Here are some additional details that could be included in the rephrased text:
-
-1. The age distribution is bimodal, which means that it has two distinct peaks. This could be due to a number of factors, such as the airline's target customer base, or the typical age of people who travel by air.
-2. The flight distance distribution is log-normal, which means that it is skewed to the right. This is likely due to the fact that there are a few very long flights, which skew the distribution.
-3. The departure delay and arrival delay distributions are very similar, which suggests that they are caused by the same factors. These factors could include weather conditions, air traffic control delays, or mechanical problems with the aircraft. Also, it's very likely to think that probably if a flight is started lately, it's almost certain that it's gonna be late at the arrival with the same amount of time.
-
+This section presents histograms to visualize the distribution of numeric variables in the dataset. 
 ```{r fig.width=8}
 # plot distribution and density of numeric variables excluding ratings features
 plots = list()
@@ -319,14 +317,17 @@ for (col in names(data)[sapply(data, is.numeric)]) {
 grid.arrange(grobs = plots, ncol = 2)
 ```
 
+The histograms provide a useful overview of the distribution of the numeric variables in the dataset. This information can be used to identify potential outliers, and to choose appropriate statistical methods for analyzing the data:
+
+1. The age distribution is bimodal, which means that it has two distinct peaks. This could be due to a number of factors, such as the airline's target customer base, or the typical age of people who travel by air.
+
+2. The flight distance distribution is log-normal, which means that it is skewed to the right. This is likely due to the fact that there are a few very long flights, which skew the distribution.
+
+3. The departure delay and arrival delay distributions are very similar, which suggests that they are caused by the same factors. These factors could include weather conditions, air traffic control delays, or mechanical problems with the aircraft.
+
 ## Variables vs Target
 
-The observations from the graph analysis provide valuable insights into how different nominal features relate to passenger satisfaction:
-1. Gender: both males and females appear to have similar distributions in terms of satisfaction, indicating that gender may not be a strong predictor of passenger satisfaction. The distributions closely resemble the overall distribution of the satisfaction feature.
-2. Customer type: the graph suggests that "disloyal customers" are more likely to be unsatisfied or neutral compared to "loyal customers." This indicates that customer loyalty may play a role in passenger satisfaction, with loyal customers tending to be more satisfied.
-3. Type of travel: The graph indicates that "personal travelers" are more likely to be unsatisfied compared to "business travelers." Conversely, "business travelers" tend to have a higher proportion of satisfied passengers. This finding suggests that the purpose of travel may have an influence on passenger satisfaction.
-4. Class: The graph shows that "business class" passengers are more satisfied than unsatisfied, whereas "eco" and "eco plus" passengers tend to have a higher proportion of unsatisfied passengers. This suggests that the class of service provided by the airline may be a significant factor affecting passenger satisfaction.
-
+### Categorical Variables vs Target
 ```{r fig.width=10}
 # plots categorical variables vs satisfaction
 plots = list()
@@ -345,25 +346,17 @@ for (col in names(data)[sapply(data, is.factor)]) {
 
 grid.arrange(grobs = plots, ncol = 2)
 ```
+The observations from the graph analysis provide valuable insights into how different nominal features relate to passenger satisfaction:
 
-Based on the observed distribution of the ratings, we can draw the following conclusion:
-1. For most of the ratings, the mean value for unsatisfied/neutral consumers is around 3, except for "Inflight Service" and "Baggage Handling." 
-```{r}
-# calculate the mean of the ratings of unsatisfied/neutral consumers
-ratings_data = data[data$satisfaction == "neutral or dissatisfied", c(ratings_fts_names)]
-ratings_data <- apply(ratings_data, 2, as.numeric)
-ratings_mean = colMeans(ratings_data)
-ratings_mean
-```
-2. For most of the ratings given by satisfied consumers, the mean value is around 4. However, it's important to note that we cannot generalize from this information alone. 
-```{r}
-# calculate the mean of the ratings of unsatisfied/neutral consumers
-ratings_data = data[data$satisfaction == "satisfied", c(ratings_fts_names)]
-ratings_data <- apply(ratings_data, 2, as.numeric)
-ratings_mean = colMeans(ratings_data)
-ratings_mean
-```
+1. Gender: both males and females appear to have similar distributions in terms of satisfaction, indicating that gender may not be a strong predictor of passenger satisfaction. The distributions closely resemble the overall distribution of the satisfaction feature.
 
+2. Customer type: the graph suggests that "disloyal customers" are more likely to be unsatisfied or neutral compared to "loyal customers." This indicates that customer loyalty may play a role in passenger satisfaction, with loyal customers tending to be more satisfied.
+
+3. Type of travel: The graph indicates that "personal travelers" are more likely to be unsatisfied compared to "business travelers." Conversely, "business travelers" tend to have a higher proportion of satisfied passengers. This finding suggests that the purpose of travel may have an influence on passenger satisfaction.
+
+4. Class: The graph shows that "business class" passengers are more satisfied than unsatisfied, whereas "eco" and "eco plus" passengers tend to have a higher proportion of unsatisfied passengers. This suggests that the class of service provided by the airline may be a significant factor affecting passenger satisfaction.
+
+### Rating Features vs Target
 ```{r fig.height=22, fig.width=10}
 # plots ratings features vs satisfaction
 plots = list()
@@ -382,17 +375,32 @@ for (col in names(data)[sapply(data, is.factor)]) {
 grid.arrange(grobs = plots, ncol = 2)
 ```
 
-Based on the boxplots and the information provided, we can make the following observations about the distributions of the numerical features:
+Based on the observed distribution of the ratings, we can draw the following conclusion:
 
-1. Age: the boxplot for "Age" suggests that the distribution is approximately normal. Furthermore, it appears that neutral or dissatisfied customers tend to be slightly younger on average compared to satisfied customers.
+1. For most of the ratings, the mean value for unsatisfied/neutral consumers is around 3, except for "Inflight Service" and "Baggage Handling." 
+```{r}
+# calculate the mean of the ratings of unsatisfied/neutral consumers
+ratings_data = data[data$satisfaction == "neutral or dissatisfied", c(ratings_fts_names)]
+ratings_data <- apply(ratings_data, 2, as.numeric)
+ratings_mean = colMeans(ratings_data)
+ratings_mean
+```
+2. For most of the ratings given by satisfied consumers, the mean value is around 4. However, it's important to note that we cannot generalize from this information alone. 
+```{r}
+# calculate the mean of the ratings of unsatisfied/neutral consumers
+ratings_data = data[data$satisfaction == "satisfied", c(ratings_fts_names)]
+ratings_data <- apply(ratings_data, 2, as.numeric)
+ratings_mean = colMeans(ratings_data)
+ratings_mean
+```
 
-2. Flight Distance: the boxplot does not exhibit a normal distribution. Instead, it appears to have a right-skewed distribution. This is evident from the longer whisker on the right side, indicating that there are some outliers with larger flight distances.
+3. we can see that certain ratings, such as "Online_boarding," "Seat_comfort," "Inflight_entertainment," "On_board_service," and "Leg_room_service," exhibit similar distributions. 
+   The neutral/unsatisfied votes appear to follow a normal curve centered around a mean of approximately 3, while the satisfied votes tend to concentrate on grades 4 and 5. 
+   This pattern strongly suggests that these ratings are not independent but rather correlated with each other.
 
-3. Departure Delay in Minutes: the boxplot for "Departure Delay in Minutes" also shows a right-skewed distribution. The majority of the data appears to be concentrated towards the lower values, with a lot of outliers representing longer departure delays.
 
-4. Arrival Delay in Minutes: similar to the "Departure Delay in Minutes," the boxplot for "Arrival Delay in Minutes" exhibits a right-skewed distribution. The bulk of the data is clustered towards the lower values, with a lot of outliers indicating longer arrival delays.
+### Numerical Variables vs Target
 
-Based on these observations, it's essential to consider the appropriate data transformations or use different distribution models when working with "Flight Distance," "Departure Delay in Minutes," and "Arrival Delay in Minutes." For example, logarithmic transformations may be suitable to handle the skewed nature of these variables in statistical analyses and modeling tasks.
 ```{r fig.height=7, fig.width=10}
 # plots numeric variables vs satisfaction excluding ratings features with histograms of different colors for each satisfaction level
 plots = list()
@@ -411,6 +419,18 @@ for (col in names(data)[sapply(data, is.numeric)]) {
 grid.arrange(grobs = plots, ncol = 2)
 
 ```
+Based on the boxplots and the information provided, we can make the following observations about the distributions of the numerical features:
+
+1. Age: the boxplot for "Age" suggests that the distribution is approximately normal. Furthermore, it appears that neutral or dissatisfied customers tend to be slightly younger on average compared to satisfied customers.
+
+2. Flight Distance: the boxplot does not exhibit a normal distribution. Instead, it appears to have a right-skewed distribution. This is evident from the longer whisker on the right side, indicating that there are some outliers with larger flight distances.
+
+3. Departure Delay in Minutes: the boxplot for "Departure Delay in Minutes" also shows a right-skewed distribution. The majority of the data appears to be concentrated towards the lower values, with a lot of outliers representing longer departure delays.
+
+4. Arrival Delay in Minutes: similar to the "Departure Delay in Minutes," the boxplot for "Arrival Delay in Minutes" exhibits a right-skewed distribution. The bulk of the data is clustered towards the lower values, with a lot of outliers indicating longer arrival delays.
+
+Based on these observations, it's essential to consider the appropriate data transformations or use different distribution models when working with "Flight Distance," "Departure Delay in Minutes," and "Arrival Delay in Minutes." For example, logarithmic transformations may be suitable to handle the skewed nature of these variables in statistical analyses and modeling tasks.
+
 ## CORRELATION MATRIX
 ```{r}
 ## CORRELATION MATRIX FOR NUMERICAL VARIABLES
@@ -479,8 +499,8 @@ corrplot(partial_corr_matrix_cat,
 ```
 # Convert categorical to numerical
 
-This section converts the categorical variables to numeric
-representation for further analysis.
+In this section we convert the categorical variables to numeric
+representation for modelling.
 
 ```{r}
 gender_map = c("Male" = 0, "Female" = 1)
@@ -527,10 +547,10 @@ test_data = data[-train_index,]
 ```{r}
 
 # Seperate y_train and y_test for further use
-X_train = as.matrix(train_data %>% select(-satisfaction))
+X_train = as.matrix(train_data %>% dplyr::select(-satisfaction))
 y_train = train_data$satisfaction
 
-X_test = as.matrix(test_data %>% select(-satisfaction))
+X_test = as.matrix(test_data %>% dplyr::select(-satisfaction))
 y_test = test_data$satisfaction
 ```
 
@@ -564,17 +584,6 @@ To build a classifier, we utilize a set of training observations. From a geometr
 
 ## Logistic Regression
 
-As our initial modeling technique, we propose using logistic regression, specifically the binomial generalized linear model (GLM), which is widely employed for analyzing binary response variables. In our analysis, we focus on the binary response variable "satisfaction" indicating whether a customer is satisfied or not.
-
-The logistic regression model estimates the probability of heart disease based on various predictor variables, utilizing the logistic function. To begin, we construct the complete model, incorporating all available predictor variables. However, we aim to refine this model using the stepwise technique, which combines both backward and forward selection methods.
-
-Stepwise selection is a variable selection approach that helps identify a subset of predictor variables most relevant to the outcome. By iteratively adding or removing variables based on their statistical significance and contribution to the model's performance, we aim to find a parsimonious model with the most influential predictor variables and significant interactions.
-
-In backward selection, we start with the full model and progressively eliminate variables with the least impact on the model's fit, until we arrive at the optimal model. On the other hand, forward selection incrementally adds variables based on their individual significance, selecting the ones that contribute the most to the model's performance at each step.
-
-By combining backward and forward selection in the stepwise technique, we intend to identify the most relevant predictor variables while maintaining model simplicity. This iterative process ensures that the model includes only the most important variables for predicting the outcome, thereby improving interpretability and predictive accuracy.
-
-Once we have the initial complete model, we address the possibility of collinearity among predictor variables by using the Variance Inflation Factor (VIF) function. Collinearity occurs when independent variables are highly correlated, making it challenging to discern their individual effects on the dependent variable. By addressing collinearity, we enhance the model's accuracy and reliability, ensuring that each predictor's unique contribution to the outcome is adequately captured.
 In logistic model observations are assumed to be realizations of independent Bernoulli random variables. It is like if a customer will be satisfied with flight or not.
 
 ### Basic Logistic Classifier
