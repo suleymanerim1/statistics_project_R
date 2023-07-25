@@ -299,7 +299,7 @@ Here are some additional details that could be included in the rephrased text:
 
 1. The age distribution is bimodal, which means that it has two distinct peaks. This could be due to a number of factors, such as the airline's target customer base, or the typical age of people who travel by air.
 2. The flight distance distribution is log-normal, which means that it is skewed to the right. This is likely due to the fact that there are a few very long flights, which skew the distribution.
-3. The departure delay and arrival delay distributions are very similar, which suggests that they are caused by the same factors. These factors could include weather conditions, air traffic control delays, or mechanical problems with the aircraft.
+3. The departure delay and arrival delay distributions are very similar, which suggests that they are caused by the same factors. These factors could include weather conditions, air traffic control delays, or mechanical problems with the aircraft. Also, it's very likely to think that probably if a flight is started lately, it's almost certain that it's gonna be late at the arrival with the same amount of time.
 
 ```{r fig.width=8}
 # plot distribution and density of numeric variables excluding ratings features
@@ -411,6 +411,30 @@ for (col in names(data)[sapply(data, is.numeric)]) {
 grid.arrange(grobs = plots, ncol = 2)
 
 ```
+# Correlation matrix
+## Correlation matrix for numerical variables
+```{r}
+ds_cor1 <- cor(subset(data,select = c(Age, Flight_Distance,Departure_Delay_in_Minutes,Arrival_Delay_in_Minutes)))
+summary(ds_cor1)
+options(repr.plot.width = 14, repr.plot.height = 8)
+corrplot(ds_cor1, na.label = " ", method="color", tl.col = "black", tl.cex = 1)
+
+```
+## Correlation matrix for ordinal variables
+```{r}
+ds_cor2 <- cor(subset(data, select = c(Inflight_wifi_service, Departure_Arrival_time_convenient, Ease_of_Online_booking, Gate_location, Food_and_drink, Online_boarding, Seat_comfort, Inflight_entertainment, On_board_service, Leg_room_service, Baggage_handling, Checkin_service, Inflight_service,Cleanliness)))
+summary(ds_cor2)
+options(repr.plot.width = 14, repr.plot.height = 8)
+corrplot(ds_cor2, na.label=" ", tl.cex=1, tl.col="black", method="color")
+```
+## Discussion on correlations results
+There exists a strong positive correlation between arrival delay and departure delay. In other words, if a flight departs late, it is highly probable that it will also arrive late.
+
+Certain variables like seat comfort, food and drink quality, and the availability of in-flight entertainment tend to be positively correlated. This means that when one of these aspects is rated higher, the others are also likely to receive positive ratings.
+
+Similarly, variables such as WiFi service, online booking convenience, and gate location tend to show a positive correlation. So, when one of these factors is well-received, the others are also more likely to be positively regarded.
+
+Cleanliness is found to be correlated with gate location, food and drink quality, seat comfort, and the availability of in-flight entertainment. In other words, a higher level of cleanliness is often associated with favorable ratings in these other areas as well.
 
 # Convert categorical to numerical
 
@@ -499,7 +523,17 @@ To build a classifier, we utilize a set of training observations. From a geometr
 
 ## Logistic Regression
 
-In logistic model observations are assumed to be realizations of independent Bernoulli random variables. It is like if a customer will be satisfied with flight or not.
+As our initial modeling technique, we propose using logistic regression, specifically the binomial generalized linear model (GLM), which is widely employed for analyzing binary response variables. In our analysis, we focus on the binary response variable "satisfaction" indicating whether a customer is satisfied or not.
+
+The logistic regression model estimates the probability of heart disease based on various predictor variables, utilizing the logistic function. To begin, we construct the complete model, incorporating all available predictor variables. However, we aim to refine this model using the stepwise technique, which combines both backward and forward selection methods.
+
+Stepwise selection is a variable selection approach that helps identify a subset of predictor variables most relevant to the outcome. By iteratively adding or removing variables based on their statistical significance and contribution to the model's performance, we aim to find a parsimonious model with the most influential predictor variables and significant interactions.
+
+In backward selection, we start with the full model and progressively eliminate variables with the least impact on the model's fit, until we arrive at the optimal model. On the other hand, forward selection incrementally adds variables based on their individual significance, selecting the ones that contribute the most to the model's performance at each step.
+
+By combining backward and forward selection in the stepwise technique, we intend to identify the most relevant predictor variables while maintaining model simplicity. This iterative process ensures that the model includes only the most important variables for predicting the outcome, thereby improving interpretability and predictive accuracy.
+
+Once we have the initial complete model, we address the possibility of collinearity among predictor variables by using the Variance Inflation Factor (VIF) function. Collinearity occurs when independent variables are highly correlated, making it challenging to discern their individual effects on the dependent variable. By addressing collinearity, we enhance the model's accuracy and reliability, ensuring that each predictor's unique contribution to the outcome is adequately captured.
 
 ### Basic Logistic Classifier
 ```{r}
