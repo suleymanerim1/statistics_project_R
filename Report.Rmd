@@ -642,6 +642,7 @@ ds_cor1 <- cor(subset(data,select = c(Age,Flight_Distance,Departure_Delay_in_Min
 options(repr.plot.width = 14, repr.plot.height = 8)
 corrplot(ds_cor1, na.label = " ", method="color", tl.col = "black", tl.cex = 1)
 ```
+
 ```{r}
 ds_cor1_df <- data.frame()
 
@@ -671,7 +672,11 @@ ds_cor1_df <- ds_cor1_df[!duplicated(ds_cor1_df$CorrelationValue), ]
 print(ds_cor1_df)
 ```
 
-The correlation coefficient of 0.965 between "Departure_Delay_in_Minutes" and "Arrival_Delay_in_Minutes" indicates a strong positive relationship between these two variables. This suggests that there is a high tendency for flights with longer departure delays to also have longer arrival delays.
+The correlation coefficient of 0.965 between
+"Departure_Delay_in_Minutes" and "Arrival_Delay_in_Minutes" indicates a
+strong positive relationship between these two variables. This suggests
+that there is a high tendency for flights with longer departure delays
+to also have longer arrival delays.
 
 ```{r}
 ## CORRELATION MATRIX FOR ORDINAL VARIABLES
@@ -691,8 +696,6 @@ ds_cor2 <- cor(subset(data, select = ordinal_variables))
 options(repr.plot.width = 14, repr.plot.height = 8)
 corrplot(ds_cor2, na.label=" ", tl.cex=1, tl.col="black", method="color")
 ```
-
-
 
 ```{r}
 ds_cor2_df = data.frame()
@@ -720,8 +723,8 @@ ds_cor2_df <- ds_cor2_df[!duplicated(ds_cor2_df$CorrelationValue), ]
 print(ds_cor2_df)
 ```
 
-
 # Considerations
+
 1.  Arrival Delay and Departure Delay: The high positive correlation
     between "Arrival Delay" and "Departure Delay" indicates that there
     is a strong relationship between these two variables. If a flight
@@ -869,26 +872,39 @@ partial_corr_cat_dataframe <- partial_corr_cat_dataframe[!duplicated(partial_cor
 print(partial_corr_cat_dataframe)
 
 ```
-We computed the partial correlations for each pair of categorical features and identified correlations with an absolute value greater than 0.5. We then removed rows where Feature1 and Feature2 are equal and removed any duplicate correlations to obtain the final results.
 
-Below are the significant partial correlations between categorical features:
+We computed the partial correlations for each pair of categorical
+features and identified correlations with an absolute value greater than
+0.5. We then removed rows where Feature1 and Feature2 are equal and
+removed any duplicate correlations to obtain the final results.
 
-1. Inflight WiFi service and Ease of Online booking: 0.552
-There is a moderate positive correlation between passengers' satisfaction with inflight WiFi service and the ease of the online booking process.
+Below are the significant partial correlations between categorical
+features:
 
-2. Food and drink and Inflight entertainment: 0.349
-Passengers who are satisfied with the food and drink options onboard are more likely to enjoy the inflight entertainment.
+1.  Inflight WiFi service and Ease of Online booking: 0.552 There is a
+    moderate positive correlation between passengers' satisfaction with
+    inflight WiFi service and the ease of the online booking process.
 
-3. Online boarding and Seat comfort: 0.318
-There is a positive correlation between passengers' satisfaction with the online boarding process and their comfort with the seating arrangements.
+2.  Food and drink and Inflight entertainment: 0.349 Passengers who are
+    satisfied with the food and drink options onboard are more likely to
+    enjoy the inflight entertainment.
 
-4. Inflight entertainment and Cleanliness: 0.401.
-Passengers who find the inflight entertainment enjoyable are more likely to rate the cleanliness of the aircraft positively.
+3.  Online boarding and Seat comfort: 0.318 There is a positive
+    correlation between passengers' satisfaction with the online
+    boarding process and their comfort with the seating arrangements.
 
-6. Baggage handling and Inflight service: 0.372
-There is a positive correlation between passengers' satisfaction with baggage handling and their perception of inflight service quality.
+4.  Inflight entertainment and Cleanliness: 0.401. Passengers who find
+    the inflight entertainment enjoyable are more likely to rate the
+    cleanliness of the aircraft positively.
 
-For numerical features, we have only a significant partial correlation between departure_Delay_in_Minutes and arrival_Delay_in_Minutes. It was expected and it can confirm our assumption: if a flight has a departure delay, it's very likely to have also an arrival delay.
+5.  Baggage handling and Inflight service: 0.372 There is a positive
+    correlation between passengers' satisfaction with baggage handling
+    and their perception of inflight service quality.
+
+For numerical features, we have only a significant partial correlation
+between departure_Delay_in_Minutes and arrival_Delay_in_Minutes. It was
+expected and it can confirm our assumption: if a flight has a departure
+delay, it's very likely to have also an arrival delay.
 
 ## Convert categorical to numerical
 
@@ -1681,6 +1697,8 @@ conf_matrix_knn <- confusionMatrix(data = pred_knn, reference = as.factor(y_test
 draw_confusion_matrix(conf_matrix_knn)
 ```
 
+# Conclusions
+
 In our project, we want to find unsatisfied customers as precise as
 possible. Because, our hypothesis is to increase total customer
 satisfaction with low budget. Therefore, finding unsatisfied customers
@@ -1689,9 +1707,37 @@ method. Considering that, precision metric will be most valuable metric.
 Then we can count on F1 score, since it considers both Precision and
 Recall into account.
 
+We explored three different classification algorithms: Logistic
+Regression with different variable selection techniques, Naive Bayes,
+and K-Nearest Neighbors (KNN), to compare their performance.
+
+Logistic Regression with the full features model demonstrated the best
+generalizability among all the tested models. Despite the expectation
+that backward variable selection and lasso regression might improve
+performance, the full features model outperformed them on the test set.
+
+Naive Bayes showed promising results with a respectable accuracy score.
+However, it had slightly lower precision and F1 score compared to the
+best-performing model, Logistic Regression with the full features model.
+
 KNN has the highest precision score rather than Naive Bayes and Logistic
 Regression with full features model. However, KNN is an non-parametric
 model and it does not have any bias related to hypothesis space.
 Therefore, the complexity of model increases with number of samples.
 Besides, we used cross-validation which also increases model complexity.
 We can use a validation set approach to decrease training time.
+
+Considering the main objective of this project to maximize precision, we
+select the best-performing model: Logistic Regression with the full
+features model. This model demonstrated superior performance in terms of
+precision, recall, and F1 score. Moreover, its generalizability suggests
+that it can be effectively applied to new and unseen data.
+
+Final Remarks Overall, the results of this project highlight the
+potential of machine learning in predicting customer satisfaction. The
+selected Logistic Regression model with full features showcases
+promising performance and generalizability. By identifying and
+addressing the pain points of unsatisfied customers, businesses can take
+proactive measures to enhance customer satisfaction and loyalty,
+ultimately leading to higher customer retention and overall business
+success.
