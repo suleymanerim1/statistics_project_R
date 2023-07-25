@@ -635,13 +635,43 @@ affect each other.
 ## CORRELATION MATRIX FOR NUMERICAL VARIABLES
 
 ds_cor1 <- cor(subset(data,select = c(Age,Flight_Distance,Departure_Delay_in_Minutes,Arrival_Delay_in_Minutes)))
-summary(ds_cor1)
+
 ```
 
 ```{r fig.height=7, fig.width=10}
 options(repr.plot.width = 14, repr.plot.height = 8)
 corrplot(ds_cor1, na.label = " ", method="color", tl.col = "black", tl.cex = 1)
 ```
+```{r}
+ds_cor1_df <- data.frame()
+
+# Loop through the rows and columns of 'ds_cor1'
+for (row in rownames(ds_cor1)) {
+  for (col in colnames(ds_cor1)) {
+    # Check if the correlation is greater than 0.3 or less than -0.3
+    if (ds_cor1[row, col] > 0.3 | ds_cor1[row, col] < -0.3) {
+      # Create a new row with the feature names and correlation value
+      new_row <- c(row, col, ds_cor1[row, col])
+      # Append the new row to the 'ds_cor1_df'
+      ds_cor1_df <- rbind(ds_cor1_df, new_row)
+    }
+  }
+}
+
+# Set appropriate column names for the result dataframe
+colnames(ds_cor1_df) <- c("Feature1", "Feature2", "CorrelationValue")
+
+# Delete correlation values for features with themselves
+ds_cor1_df <- ds_cor1_df[ds_cor1_df$Feature1 != ds_cor1_df$Feature2, ]
+
+# Remove duplicate rows based on the CorrelationValue column
+ds_cor1_df <- ds_cor1_df[!duplicated(ds_cor1_df$CorrelationValue), ]
+
+# Print the resulting dataframe
+print(ds_cor1_df)
+```
+
+The correlation coefficient of 0.965 between "Departure_Delay_in_Minutes" and "Arrival_Delay_in_Minutes" indicates a strong positive relationship between these two variables. This suggests that there is a high tendency for flights with longer departure delays to also have longer arrival delays.
 
 ```{r}
 ## CORRELATION MATRIX FOR ORDINAL VARIABLES
@@ -653,7 +683,7 @@ for (col in ordinal_variables) {
 }
 
 ds_cor2 <- cor(subset(data, select = ordinal_variables))
-summary(ds_cor2)
+
 
 ```
 
@@ -662,6 +692,36 @@ options(repr.plot.width = 14, repr.plot.height = 8)
 corrplot(ds_cor2, na.label=" ", tl.cex=1, tl.col="black", method="color")
 ```
 
+
+
+```{r}
+ds_cor2_df = data.frame()
+
+for (row in rownames(ds_cor2)) {
+  for (col in colnames(ds_cor2)) {
+    # Check if the partial correlation is greater than 0.5 or less than -0.5
+    if (ds_cor2[row, col] > 0.3 | ds_cor2[row, col] < -0.3) {
+      # Create a new row with the feature names and correlation value
+      new_row <- c(row, col, ds_cor2[row, col])
+      # Append the new row to the 'partial_corr_cat_dataframe'
+      ds_cor2_df <- rbind(ds_cor2_df, new_row)
+    }
+  }
+}
+
+# Set appropriate column names for the result dataframe
+colnames(ds_cor2_df)= c("Feature1", "Feature2", "CorrelationValue")
+
+# delete correlation value for feature with themselves
+ds_cor2_df = ds_cor2_df[ds_cor2_df$Feature1 != ds_cor2_df$Feature2,]
+
+ds_cor2_df <- ds_cor2_df[!duplicated(ds_cor2_df$CorrelationValue), ]
+# Print the resulting dataframe
+print(ds_cor2_df)
+```
+
+
+# Considerations
 1.  Arrival Delay and Departure Delay: The high positive correlation
     between "Arrival Delay" and "Departure Delay" indicates that there
     is a strong relationship between these two variables. If a flight
