@@ -1,11 +1,25 @@
 # import libraries
 library(tidyverse)
+library(tinytex)
+library(dplyr)
 library(corrplot)
 library(ggplot2)
 library(gridExtra)
 library(correlation)
 library(reshape)
 library(reshape2)
+library(tidyverse) # for data manipulation
+library(ggplot2) # for plotting
+library(gridExtra) # for grid.arrange
+library(regclass) # for VIF package
+library(MLmetrics) # to create confusion matrix
+library(pROC) # for ROC Curve
+library(e1071) # for Naive Bayes Classifier
+library(class)
+library(caret)
+library(corrr)
+library(ppcor)
+library(glmnet) # for Lasso Regression
 
 
 data_train = read.csv("train.csv")
@@ -326,142 +340,50 @@ grid.arrange(a, b, c, d, e, f, g, h, ncol = )
 
 
 
-#CORRELATION MATRIX again but now we are interested in partial correlation
-#So we look for all the correlations between variables
-#We pick the highest, setting a treshold of our choice
-
-#build a dataframe where for each variable we look the partial correlation with all the others
-#we pick the highest and we save it in a dataframe
-#we set a threshold of 0
-
-library(corrr)
-library(viridis)
-
-#save the partial correlation matrix result in a dataframe and output a file for further analysis
-
-# do the partial correlation only for numerical variables
-partial_corr = correlation(data[,sapply(data, is.numeric)], partial=TRUE, method = "spearman", use = "pairwise.complete.obs", verbose = TRUE)
-write.csv(partial_corr, file = "partial_corr.csv")
-
-partial_correlations = read.csv("partial_corr.csv", header = TRUE, sep = ",")
-
-
-head(partial_correlations)
-#make the first column the row names
-
-rownames(partial_correlations) = partial_correlations[,1]
-
-# delete the first column
-partial_correlations = partial_correlations[,-1]
-
-#round the values
-partial_correlations_rounded = round(partial_correlations, digits = 3)
 
 
 
 
-# Assuming your correlation matrix dataframe is named "correlation_matrix"
-# Replace "correlation_matrix" with the actual name of your dataframe if different
+numerical_features <- c("Age", "Flight_Distance", "Departure_Delay_in_Minutes", "Arrival_Delay_in_Minutes")
+partial_correlations_num <- pcor(data[, numerical_features], method = "spearman")
 
-# Remove the first column (variable names) to keep only numeric values
-correlation_matrix_numeric <- partial_correlations[, -1]
+# make the matrix
+partial_corr_matrix_num <- partial_correlations_num$estimate
 
-# Convert the data to a matrix
-correlation_matrix_matrix <- as.matrix(partial_correlations)
+# Customize the plot size
+options(repr.plot.width = 200, repr.plot.height = 200)
 
+# Create the correlation plot
+corrplot(partial_corr_matrix_num,
+         method = "color",  # Choose "color" to visualize the correlations using colors
+         type = "upper",    # Only plot the upper triangular part of the matrix (to avoid duplication)
+         tl.col = "black",  # Label color
+         tl.cex = 1,        # Label font size
+)
 
-# Melt the data to create a tidy data format suitable for ggplot2
-library(reshape2)
-correlation_matrix_melted <- melt(correlation_matrix_matrix)
-correlation_matrix_melted$value <- as.numeric(correlation_matrix_melted$value)
-correlation_matrix_melted
+#PARTIAL CORRELATION MATRIX FOR CATEGORICAL/ORDINAL
+categorical_features = c('Inflight_wifi_service', 'Departure_Arrival_time_convenient', 'Ease_of_Online_booking', 'Gate_location', 'Food_and_drink', 'Online_boarding', 'Seat_comfort', 'Inflight_entertainment', 'On_board_service', 'Leg_room_service', 'Baggage_handling', 'Checkin_service', 'Inflight_service','Cleanliness')
+partial_correlations_cat <- pcor(data[, categorical_features], method = "spearman")
 
-# Create the heatmap using ggplot2
-ggplot(correlation_matrix_melted, aes(x = Var2, y = Var2, fill = value)) +
-  geom_tile() +
-  scale_fill_gradient(low = "blue", high = "red") + # Choose your desired color scale
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate the x-axis labels
+# make the matrix
+partial_corr_matrix_cat <- partial_correlations_cat$estimate
 
+# Customize the plot size
+options(repr.plot.width = 200, repr.plot.height = 200)
 
-
-
-
-correlation_matrix_melted$value
-
-
-
-
-
-
-
-
+# Create the correlation plot
+corrplot(partial_corr_matrix_cat,
+         method = "color",  # Choose "color" to visualize the correlations using colors
+         type = "upper",    # Only plot the upper triangular part of the matrix (to avoid duplication)
+         tl.col = "black",  # Label color
+         tl.cex = 1,        # Label font size
+)
 
 
+# make a dataframe with the partial correlation matrix of categorical
+partial_correlations_cat_df <- as.data.frame(partial_corr_matrix_cat)
 
-# Initialize empty data frame with 0 rows
-# We need it to create a data frame with the results and
-# so to show better the correlations.
-df <- data.frame(variable1 = character(),
-                 variable2 = character(),
-                 value = numeric(),
-                 stringsAsFactors = FALSE)
-
-# Loop over rows and columns of matrix
-for (i in 1:nrow(partial_correlations_rounded)) {
-  for (j in 1:ncol(partial_correlations_rounded)) {
-    print(partial_correlations_rounded[i,j])
-    # Check if value meets criterion
-    if ((partial_correlations_rounded[i,j] > 0.300 | partial_correlations_rounded[i,j] < -0.300)& i != j) {
-      print('it is true')
-      # Add row to data frame
-      df <- rbind(df, data.frame(variable1 = rownames(partial_correlations_rounded)[i],
-                                 variable2 = colnames(partial_correlations_rounded)[j],
-                                 value = partial_correlations_rounded[i,j],
-                                 stringsAsFactors = FALSE))
-    }
-  }
-}
-
-# Group the data frame by variable1 and extract top 3 values for each group
-df_top3 <- df %>% group_by(variable1) %>% top_n(4, value) %>% ungroup()
-
-#order by variable1
-df_top3 <- df_top3[order(df_top3$variable1),]
-
-
-#delete duplicates in the dataframe if variable1 is equal to variable2
-df_top3 <- df_top3[!(df_top3$variable1 == df_top3$variable2),]
-
-print(df_top3, n = nrow(df_top3))
-#save on cvs
-write.csv(df_top3, file = "df_top3.csv")
-
-
-#TODO:EXPLAIN THE CORRELATIONS AND PLOTTING THE RESULTS 
-
-par(mfrow = c(1, 1))
-
-### Relation between Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes (linear)
-# standardize Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes
-arrival_std = scale(data$Arrival_Delay_in_Minutes)
-departure_std = scale(data$Departure_Delay_in_Minutes)
-# scatter plot of Arrival_Delay_in_Minutes and Departure_Delay_in_Minutes 
-plot(arrival_std, departure_std, xlab = "Arrival_Delay_in_Minutes", ylab = "Departure_Delay_in_Minutes")
-# plot line y = x
-abline(0, 1, col = "red")
-
-### Relationship between Class (Business, Eco, Eco Plus) and Type of travel (Personal Travel, Business Travel)
-
-# plot barplot coloured for each type of class vs type of travel
-ggplot(data, aes(x = Class, fill = Type_of_Travel)) +
-  geom_bar(position = "dodge") +
-  labs(title = "Histogram of Class by Type of Travel", x = "Class", y = "Count")
-
-
-
-
-
+head(partial_correlations_cat_df)
 
 
 
