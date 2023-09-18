@@ -43,8 +43,8 @@ library(glmnet) # for Lasso Regression
 ```
 
 ```{r message=FALSE}
-data_train = read.csv("C:/Users/matti/Documents/GitHub/stat_project/train.csv")
-data_test = read.csv("C:/Users/matti/Documents/GitHub/stat_project/test.csv")
+data_train = read.csv("train.csv")
+data_test = read.csv("test.csv")
 
 
 
